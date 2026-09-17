@@ -6,7 +6,7 @@ const chalk = require('chalk');
 const exec = require('child_process').exec;
 
 const CaType = require('./caTypes');
-const { getTypeFolder, buildLocalRelPath } = require('./caTypes');
+const { nameToRelPath, extensionFor, relPathToName, assertNoForeignTypePrefix } = require('./caPaths');
 const { getBmc, saveBmc } = require('./bmcConfig');
 const getWorkspacePath = require('./getWorkspacePath');
 const importWorkspace = require("./importWorkspace");
@@ -100,15 +100,15 @@ main()
 `;
 
 const createFileAndStatus = async (wpPath, ca, type, openVsCode) => {
-  const baseName = importWorkspace.formatName(ca.name);
-  const ext = type === CaType.AI_FUNCTION ? 'ts' : 'js';
-  const typeFolder = getTypeFolder(type);
-  const targetDir = typeFolder
-    ? path.join(wpPath, 'src', typeFolder)
-    : wpPath;
+  const relPath = nameToRelPath(type, ca.name);
+  const targetDir = path.join(wpPath, path.dirname(relPath));
   await fse.ensureDir(targetDir);
-  const basename = await importWorkspace.getName(targetDir, baseName, ext);
-  const newFileName = buildLocalRelPath(type, basename);
+  const basename = await importWorkspace.getName(
+    targetDir,
+    path.basename(relPath, path.extname(relPath)),
+    extensionFor(type),
+  );
+  const newFileName = `${path.dirname(relPath)}/${basename}`.split('\\').join('/');
 
   const filePath = path.join(wpPath, newFileName);
   await writeFile(filePath, ca.publishedCode, 'UTF-8');
@@ -128,6 +128,7 @@ const newCa = async (pwd, caName, type, openVsCode = false, schedule = null) => 
       throw new Error(`Invalid cron expression: "${schedule}". Expected a valid 5-field cron string (e.g. "0 * * * *").`);
     }
   }
+  assertNoForeignTypePrefix(type, caName);
   const templateByType = {
     [CaType.USER]: baseCa,
     [CaType.ENDPOINT]: baseEndPointCa,
@@ -138,7 +139,7 @@ const newCa = async (pwd, caName, type, openVsCode = false, schedule = null) => 
   };
   const newCaObj = {
     publishedCode: templateByType[type] ?? baseCa,
-    name: caName,
+    name: relPathToName(type, nameToRelPath(type, caName)),
     type: type,
     ...(schedule != null && { schedule }),
   };

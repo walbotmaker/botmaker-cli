@@ -3,8 +3,7 @@ const util = require('util');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const { getAllCas, getCustomerContext } = require('./bmService')
-const CaType = require('./caTypes');
-const { getTypeFolder, buildLocalRelPath } = require('./caTypes');
+const { formatName, nameToRelPath, extensionFor } = require('./caPaths');
 const fse = require('fs-extra');
 const { saveBmc, saveContext } = require('./bmcConfig');
 
@@ -14,14 +13,6 @@ const writeFile = util.promisify(fs.writeFile);
 const exists = util.promisify(fs.exists);
 const mkdir = util.promisify(fs.mkdir);
 const copyAll = util.promisify(fse.copy);
-
-const formatName = (name) =>
-  name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // remove acents
-    .replace(/\W+/g, "_") // remplace spaces with underscore
-    .replace(/[\u{0080}-\u{FFFF}]/gu, "") // remove all non ascii chars
-    .toLowerCase();
 
 const getName = async (folder, basename, extension, num) => {
   const counterPart = num !== undefined ? '_' + num : '';
@@ -79,15 +70,15 @@ const importWorkspace = async (pwd, apiToken) => {
   await copyAll(baseTemplate, workspacePath);
   await saveContext(workspacePath, context);
   for (const ca of cas) {
-    const baseName = formatName(ca.name);
-    const ext = ca.type === CaType.AI_FUNCTION ? 'ts' : 'js';
-    const typeFolder = getTypeFolder(ca.type);
-    const targetDir = typeFolder
-      ? path.join(workspacePath, 'src', typeFolder)
-      : workspacePath;
+    const relPath = nameToRelPath(ca.type, ca.name);
+    const targetDir = path.join(workspacePath, path.dirname(relPath));
     await fse.ensureDir(targetDir);
-    const basename = await getName(targetDir, baseName, ext);
-    ca.filename = buildLocalRelPath(ca.type, basename);
+    const basename = await getName(
+      targetDir,
+      path.basename(relPath, path.extname(relPath)),
+      extensionFor(ca.type),
+    );
+    ca.filename = `${path.dirname(relPath)}/${basename}`.split('\\').join('/');
     await writeFile(path.join(workspacePath, ca.filename), ca.unPublishedCode || ca.publishedCode, "UTF-8");
   }
   await saveBmc(workspacePath, apiToken, cas);
