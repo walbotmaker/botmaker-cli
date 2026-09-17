@@ -35,3 +35,51 @@ test('a client action literally named like its own type folder is kept', () => {
 test('an empty name is refused', () => {
   assert.throws(() => nameToRelPath('USER', '///'), /no usable segments/);
 });
+
+const {
+  relPathToName,
+  movedName,
+  assertNoForeignTypePrefix,
+  CrossTypeMoveError,
+} = require('../src/caPaths');
+
+test('relPathToName strips src and the extension, and adds the type prefix', () => {
+  assert.strictEqual(
+    relPathToName('USER', 'src/user/ventas/promos/mifn.js'),
+    'user/ventas/promos/mifn'
+  );
+});
+
+test('a file that did not move produces no new name', () => {
+  const ca = { name: 'miFn', type: 'USER', filename: 'src/user/mifn.js' };
+  assert.strictEqual(movedName(ca, 'src/user/mifn.js'), null);
+});
+
+test('moving a file to another folder keeps the original leaf spelling', () => {
+  const ca = { name: 'miFunciónÑ', type: 'USER', filename: 'src/user/mifuncion_n.js' };
+  assert.strictEqual(
+    movedName(ca, 'src/user/ventas/mifuncion_n.js'),
+    'user/ventas/miFunciónÑ'
+  );
+});
+
+test('renaming the file itself does change the leaf', () => {
+  const ca = { name: 'miFn', type: 'USER', filename: 'src/user/mifn.js' };
+  assert.strictEqual(movedName(ca, 'src/user/ventas/otro.js'), 'user/ventas/otro');
+});
+
+test('moving a file into another type folder is refused', () => {
+  const ca = { name: 'miFn', type: 'USER', filename: 'src/user/mifn.js' };
+  assert.throws(() => movedName(ca, 'src/mcp/mifn.js'), CrossTypeMoveError);
+});
+
+test('creating a client action under another type folder is refused', () => {
+  assert.throws(
+    () => assertNoForeignTypePrefix('ENDPOINT', 'mcp/x'),
+    /folder of another client action type/
+  );
+});
+
+test('the type prefix of its own type is fine', () => {
+  assert.doesNotThrow(() => assertNoForeignTypePrefix('ENDPOINT', 'endpoint/x'));
+});

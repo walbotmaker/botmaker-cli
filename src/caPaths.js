@@ -1,5 +1,5 @@
 const CaType = require('./caTypes');
-const { getTypeFolder } = require('./caTypes');
+const { getTypeFolder, TYPE_FOLDERS } = require('./caTypes');
 
 // One path segment, cleaned up so it is safe as a file or folder name.
 const formatSegment = (segment) =>
@@ -47,10 +47,77 @@ const nameToRelPath = (type, name) => {
   return typeFolder ? `src/${typeFolder}/${file}` : file;
 };
 
+const TYPE_FOLDER_SET = new Set(TYPE_FOLDERS);
+
+const stripExtension = (value) => String(value || '').replace(/\.(ts|js)$/, '');
+
+const relPathToName = (type, relPath) => {
+  const rel = String(relPath || '').split('\\').join('/');
+  const typeFolder = getTypeFolder(type);
+  const prefix = typeFolder ? `src/${typeFolder}/` : '';
+  const inside = prefix && rel.startsWith(prefix) ? rel.slice(prefix.length) : rel;
+  const withoutExt = stripExtension(inside);
+  return typeFolder ? `${typeFolder}/${withoutExt}` : withoutExt;
+};
+
+class CrossTypeMoveError extends Error {
+  constructor(ca, cachedRel, actualRel) {
+    super(
+      `'${ca.name}' is a ${ca.type} client action but its file now sits at ` +
+      `'${actualRel}'. Move it back under 'src/${getTypeFolder(ca.type)}/'. ` +
+      `Moving a file cannot change a client action's type.`
+    );
+    this.name = 'CrossTypeMoveError';
+    this.ca = ca;
+    this.cachedRel = cachedRel;
+    this.actualRel = actualRel;
+  }
+}
+
+// Returns the new remote name when the file moved, or null when it did not.
+// The cached filename is the anchor on purpose: recomputing the name from
+// scratch every time would rename client actions nobody touched, because
+// formatSegment lowercases and strips accents.
+const movedName = (ca, actualRel) => {
+  const cachedRel = ca.filename;
+  if (!cachedRel || !actualRel || cachedRel === actualRel) return null;
+
+  const typeFolder = getTypeFolder(ca.type);
+  if (typeFolder) {
+    const segments = String(actualRel).split('/');
+    if (segments[0] !== 'src' || segments[1] !== typeFolder) {
+      throw new CrossTypeMoveError(ca, cachedRel, actualRel);
+    }
+  }
+
+  const oldBase = stripExtension(leafOf(cachedRel));
+  const newBase = stripExtension(leafOf(actualRel));
+  // Only the folder part changes on a plain move; the leaf keeps the spelling
+  // the platform already has, unless the file itself was renamed too.
+  const leaf = newBase === oldBase ? leafOf(ca.name) : newBase;
+  const folders = relPathToName(ca.type, actualRel).split('/').slice(0, -1);
+  return [...folders, leaf].join('/');
+};
+
+const assertNoForeignTypePrefix = (type, name) => {
+  const first = String(name || '').split('/').filter(Boolean)[0];
+  const typeFolder = getTypeFolder(type);
+  if (first && first !== typeFolder && TYPE_FOLDER_SET.has(first)) {
+    throw new Error(
+      `'${name}' starts with '${first}', which is the folder of another client ` +
+      `action type. A ${type} client action cannot live there.`
+    );
+  }
+};
+
 module.exports = {
   formatSegment,
   formatName,
   extensionFor,
   leafOf,
   nameToRelPath,
+  relPathToName,
+  movedName,
+  assertNoForeignTypePrefix,
+  CrossTypeMoveError,
 };
