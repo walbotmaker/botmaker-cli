@@ -8,27 +8,23 @@ const { getBmc, saveBmc } = require('./bmcConfig');
 const getWorkspacePath = require('./getWorkspacePath');
 const getDiff = require("./getDiff");
 const importWorkspace = require("./importWorkspace");
-const CaType = require('./caTypes');
-const { getTypeFolder, buildLocalRelPath } = require('./caTypes');
+const { nameToRelPath, extensionFor } = require('./caPaths');
+const { moveLocalFile } = require('./workspaceFiles');
 const fse = require('fs-extra');
 
 const writeFile = util.promisify(fs.writeFile);
 const rm = util.promisify(fs.unlink);
 
-const targetDirForNew = (wpPath, type) => {
-  const typeFolder = getTypeFolder(type);
-  return typeFolder
-    ? path.join(wpPath, 'src', typeFolder)
-    : wpPath;
-};
-
 const createNewFile = async (wpPath, status, content) => {
-  const baseName = importWorkspace.formatName(status.N);
-  const ext = status.T === CaType.AI_FUNCTION ? 'ts' : 'js';
-  const targetDir = targetDirForNew(wpPath, status.T);
+  const relPath = nameToRelPath(status.T, status.N);
+  const targetDir = path.join(wpPath, path.dirname(relPath));
   await fse.ensureDir(targetDir);
-  const basename = await importWorkspace.getName(targetDir, baseName, ext);
-  const newFileName = buildLocalRelPath(status.T, basename);
+  const basename = await importWorkspace.getName(
+    targetDir,
+    path.basename(relPath, path.extname(relPath)),
+    extensionFor(status.T),
+  );
+  const newFileName = `${path.dirname(relPath)}/${basename}`.split('\\').join('/');
   await writeFile(path.join(wpPath, newFileName), content, 'UTF-8');
   return newFileName;
 };
@@ -74,6 +70,14 @@ const makeChanges = async (wpPath, cas, status, changes) => {
     const newVersion = status.U || status.P;
 
     if (status.fn) {
+      // The folder now travels inside the remote name, so an incoming rename
+      // can mean the client action moved to another folder.
+      const wantedRel = nameToRelPath(status.T, status.N);
+      if (wantedRel !== status.fn) {
+        await moveLocalFile(wpPath, status.fn, wantedRel);
+        console.log(chalk.green(`${status.fn} moved to ${wantedRel}`));
+        status.fn = wantedRel;
+      }
       console.log(chalk.green(`${path.join(wpPath, status.fn)} has changes`));
       await writeFile(path.join(wpPath, status.fn), newVersion, 'UTF-8');
     } else {
