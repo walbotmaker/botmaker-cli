@@ -107,6 +107,13 @@ const ChangeType = {
     'yellow',
     (s) => [s.n, s.N]
   ),
+  LOCAL_MOVED: new ChangeStatusType(
+    "Moved locally",
+    'Mv',
+    '!XM !Xm !Mm',
+    'yellow',
+    (s) => [s.m, s.M]
+  ),
   TYPE_CHANGED: new ChangeStatusType(
     "Type changed",
     'Tc',
@@ -262,7 +269,8 @@ const getCaByNameOrPath = async (wpPath, cas, caName) => {
 const getLocalStatus = async (wpPath, ca) => {
   if (!ca.filename) {
     return {
-      p: null, t: null, f: null, u: null, n: null, id: ca.id, fn: null
+      p: null, t: null, f: null, u: null, n: null, id: ca.id, fn: null,
+      m: null, M: null
     }; // noLocal
   }
 
@@ -297,7 +305,9 @@ const getLocalStatus = async (wpPath, ca) => {
   const n = ca.name != null ? ca.name : null;
   const t = ca.type != null ? ca.type : null;
   const id = ca.id != null ? ca.id : null;
-  return { p, t, f, u, n, id, fn: actualRel };
+  // m is where .bmc says the file is, M is where it actually sits. They differ
+  // when someone moved the file or a whole folder in the editor.
+  return { p, t, f, u, n, id, fn: actualRel, m: cachedRel, M: actualRel };
 }
 
 const NO_REMOTE = { P: null, U: null, N: null, T: null }

@@ -29,6 +29,31 @@
 | `-f` / `--webchat-form` | Webchat Form endpoint | `src/webchatforms/` |
 | `-S "0 * * * *"` / `--schedule-ca` | Scheduled task (5-field cron expression) | `src/schedule/` |
 
+### Folders
+
+A client action's name carries its folder tree, and the first segment is its
+type: `user/ventas/promos/miFn` is the file `src/user/ventas/promos/mifn.js`.
+
+```bash
+bmc new ventas/promos/miFn          # -> src/user/ventas/promos/mifn.js
+bmc new ventas/otro -a              # -> src/mcp/ventas/otro.ts
+bmc rename ventas/promos/miFn stock/miFn
+```
+
+Older client actions whose name has no folders live at the root of their type
+folder, and stay that way until you move them.
+
+Moving files in your editor works too: `bmc status` shows them as moved and
+`bmc push` renames them on the platform. Moving a whole folder is simply every
+client action inside it moving at once.
+
+Two rules the CLI enforces:
+
+- A file cannot be moved into another type's folder. Moving a file never
+  changes a client action's type, so `bmc push` refuses the whole push and
+  tells you which file is misplaced.
+- The same file name in two different folders is fine.
+
 ---
 
 ## Running MCP / AI Function CAs locally
