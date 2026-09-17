@@ -1,4 +1,3 @@
-const path = require('path');
 const chalk = require('chalk');
 const getStatus = require("./getStatus");
 const {ChangeType} = getStatus;
