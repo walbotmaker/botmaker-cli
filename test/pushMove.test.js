@@ -55,3 +55,14 @@ test('a code change and a move on the same client action share one payload', () 
     { payload: { id: '1', unPublishedCode: 'nuevo', name: 'user/stock/a' }, fn: 'src/user/stock/a.js' },
   ]);
 });
+
+const { nameToRelPath, relPathToName, assertNoForeignTypePrefix } = require('../src/caPaths');
+
+test('renaming across folders is just a new path for the same client action', () => {
+  const ca = { name: 'user/ventas/viejo', type: 'USER', filename: 'src/user/ventas/viejo.js' };
+  const target = nameToRelPath(ca.type, 'stock/nuevo');
+
+  assert.strictEqual(target, 'src/user/stock/nuevo.js');
+  assert.strictEqual(relPathToName(ca.type, target), 'user/stock/nuevo');
+  assert.throws(() => assertNoForeignTypePrefix('USER', 'mcp/nuevo'), /another client action type/);
+});

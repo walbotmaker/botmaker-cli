@@ -1,5 +1,3 @@
-const util = require('util');
-const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 const getStatus = require("./getStatus");
@@ -8,9 +6,9 @@ const { getBmc, saveBmc } = require('./bmcConfig');
 const getWorkspacePath = require('./getWorkspacePath');
 const { updateCas } = require("./bmService");
 const { getCaByNameOrPath } = require('./getStatus');
-const importWorkspace = require("./importWorkspace");
+const { nameToRelPath, relPathToName, assertNoForeignTypePrefix } = require('./caPaths');
+const { moveLocalFile } = require('./workspaceFiles');
 
-const renameFile = util.promisify(fs.rename);
 
 const hasIncomingChanges = (changes) => {
   return changes.some(c =>
@@ -38,17 +36,17 @@ const rename = async (pwd, caName, newName) => {
   if (!codeAction || !codeAction.id) {
     throw new Error('The client action was not uploaded.');
   }
-  const toUpdate = [{id:codeAction.id, name : newName}];
+  // The new name can carry folders, so renaming is also how you move a client
+  // action. What it cannot do is cross into another type's folder.
+  assertNoForeignTypePrefix(codeAction.type, newName);
+  const newFileName = nameToRelPath(codeAction.type, newName);
+  const remoteName = relPathToName(codeAction.type, newFileName);
+  const toUpdate = [{id:codeAction.id, name : remoteName}];
   await updateCas(token,toUpdate);
-  const dir = path.dirname(codeAction.filename);
-  const ext = path.extname(codeAction.filename).slice(1);
-  const baseName = importWorkspace.formatName(newName);
-  const basename = await importWorkspace.getName(path.join(wpPath, dir), baseName, ext);
-  const newFileName = (dir === '.' || dir === '') ? basename : `${dir}/${basename}`;
-  await renameFile(path.join(wpPath, codeAction.filename), path.join(wpPath, newFileName));
-  console.log(chalk.green(`Changed ${caName} name to ${newName}.`))
+  await moveLocalFile(wpPath, codeAction.filename, newFileName);
+  console.log(chalk.green(`Changed ${caName} name to ${remoteName}.`))
   const newCas = cas.map( ca =>
-    codeAction.id === ca.id ? {...ca, name: newName, filename: newFileName} : ca
+    codeAction.id === ca.id ? {...ca, name: remoteName, filename: newFileName} : ca
   );
   await saveBmc(wpPath,token,newCas);
 };
