@@ -6,6 +6,7 @@ const { getAllCas, getCustomerContext } = require('./bmService')
 const CaType = require('./caTypes');
 const { getTypeFolder, buildLocalRelPath } = require('./caTypes');
 const fse = require('fs-extra');
+const { saveBmc, saveContext } = require('./bmcConfig');
 
 const readFile = util.promisify(fs.readFile);
 const readdir = util.promisify(fs.readdir);
@@ -76,7 +77,7 @@ const importWorkspace = async (pwd, apiToken) => {
   const bmcPath = path.join(__dirname, '..');
   const baseTemplate = path.join(bmcPath, 'workspaceTemplate');
   await copyAll(baseTemplate, workspacePath);
-  await writeFile(path.join(workspacePath, "context.json"), JSON.stringify(context, null, 4), "UTF-8");
+  await saveContext(workspacePath, context);
   for (const ca of cas) {
     const baseName = formatName(ca.name);
     const ext = ca.type === CaType.AI_FUNCTION ? 'ts' : 'js';
@@ -89,11 +90,7 @@ const importWorkspace = async (pwd, apiToken) => {
     ca.filename = buildLocalRelPath(ca.type, basename);
     await writeFile(path.join(workspacePath, ca.filename), ca.unPublishedCode || ca.publishedCode, "UTF-8");
   }
-  const bmc = {
-    cas,
-    token: apiToken,
-  }
-  await writeFile(path.join(workspacePath, ".bmc"), JSON.stringify(bmc), "UTF-8");
+  await saveBmc(workspacePath, apiToken, cas);
 }
 
 importWorkspace.getName = getName;
