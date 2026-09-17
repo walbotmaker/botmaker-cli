@@ -8,6 +8,7 @@ const getWorkspacePath = require('./getWorkspacePath');
 const { updateCas } = require("./bmService");
 const chalk = require("chalk");
 const publish = require('./publish');
+const { movedName } = require('./caPaths');
 
 const {ChangeType} = getStatus;
 const maxLength = 100000;
@@ -30,6 +31,40 @@ const getPushChanges = (status, changes) => {
   return { payload, fn: status.fn };
 }
 
+// One entry per client action whose file no longer sits where .bmc says it is.
+// Moving a folder is just every client action under it moving at once, so there
+// is no special case for folders. Throws on the first file found under the wrong
+// type folder, which aborts the push before anything is sent.
+const collectMoveUpdates = (cas, statuses) => {
+  const updates = [];
+  for (const status of statuses) {
+    if (!status || !status.fn) continue;
+    const ca = cas.find(c => c.id === status.id);
+    if (!ca) continue;
+    const name = movedName(ca, status.fn);
+    if (name && name !== ca.name) {
+      updates.push({ id: ca.id, name });
+    }
+  }
+  return updates;
+};
+
+// A client action can have a code change, a move, or both. Both travel in the
+// same payload so the server sees a single update.
+const mergePushEntries = (entries, moves, statuses) => {
+  const merged = entries.map(e => ({ payload: { ...e.payload }, fn: e.fn }));
+  for (const move of moves) {
+    const found = merged.find(e => e.payload.id === move.id);
+    if (found) {
+      found.payload.name = move.name;
+      continue;
+    }
+    const status = statuses.find(s => s && s.id === move.id);
+    merged.push({ payload: { id: move.id, name: move.name }, fn: status ? status.fn : undefined });
+  }
+  return merged;
+};
+
 const applyPush = async (token, payloads) => {
   await updateCas(token, payloads);
 }
@@ -49,6 +84,8 @@ const applyToCas = (cas, updates) => cas.map(ca => {
   if (!u) return ca;
   const next = { ...ca };
   if (u.payload.unPublishedCode !== undefined) next.unPublishedCode = u.payload.unPublishedCode;
+  if (u.payload.name !== undefined) next.name = u.payload.name;
+  if (u.fn !== undefined) next.filename = u.fn;
   return next;
 });
 
@@ -58,17 +95,19 @@ const singlePush = async (pwd, caName) => {
   if (hasIncomingChanges(changes)){
     throw new Error('There is incoming changes. You must make a pull first.');
   }
+  const { token, cas } = await getBmc(wpPath);
   const pushChanges = getPushChanges(status, changes);
-  if (!pushChanges) {
+  const moves = collectMoveUpdates(cas, [status]);
+  const toPush = mergePushEntries(pushChanges ? [pushChanges] : [], moves, [status]);
+  if (toPush.length === 0) {
     console.log(chalk.green('Nothing to push!. No local changes found.'))
     return;
   }
-  if (pushChanges.payload.unPublishedCode !== undefined) {
+  if (pushChanges && pushChanges.payload.unPublishedCode !== undefined) {
     checkClientActionLength(pushChanges.payload.unPublishedCode, caName);
   }
-  const { token, cas } = await getBmc(wpPath);
-  await applyPush(token, [pushChanges.payload]);
-  const newCas = applyToCas(cas, [pushChanges]);
+  await applyPush(token, toPush.map(t => t.payload));
+  const newCas = applyToCas(cas, toPush);
   await saveBmc(wpPath, token, newCas);
 }
 
@@ -76,20 +115,25 @@ const completePush = async (pwd) => {
   const wpPath = await getWorkspacePath(pwd)
   const { token, cas } = await getBmc(wpPath);
   const changesGenerator = getStatus.getStatusChanges(pwd);
-  let toPush = [];
+  const entries = [];
+  const statuses = [];
   for await (let statucChanges of changesGenerator) {
     const { status, changes } = statucChanges;
     if (hasIncomingChanges(changes)){
       throw new Error('There is incoming changes you must make an pull first.');
     }
+    statuses.push(status);
     const pushChanges = getPushChanges(status, changes);
     if (pushChanges) {
       if (pushChanges.payload.unPublishedCode !== undefined) {
         checkClientActionLength(pushChanges.payload.unPublishedCode, status.n);
       }
-      toPush.push(pushChanges);
+      entries.push(pushChanges);
     }
   }
+  // Throws before anything is sent if some file sits under the wrong type.
+  const moves = collectMoveUpdates(cas, statuses);
+  const toPush = mergePushEntries(entries, moves, statuses);
   if(toPush.length === 0){
     console.log(chalk.green('Nothing to push!. No local changes found.'))
     return;
@@ -99,6 +143,7 @@ const completePush = async (pwd) => {
     const ca = cas.find(c => c.id === update.payload.id);
     const tags = [];
     if (update.payload.unPublishedCode !== undefined) tags.push('code');
+    if (update.payload.name !== undefined) tags.push(`moved to ${update.payload.name}`);
     console.log(chalk.yellow(` * ${chalk.italic(update.fn)} `) + chalk.grey(`${ca.name} [${tags.join(', ')}]`))
   })
   await applyPush(token, toPush.map(t => t.payload));
@@ -116,5 +161,8 @@ const push = async (pwd, caName, forPublish) => {
     await publish(pwd, caName);
   }
 };
+
+push.collectMoveUpdates = collectMoveUpdates;
+push.mergePushEntries = mergePushEntries;
 
 module.exports = push;
