@@ -144,7 +144,9 @@ const posibleChanges = Object.values(ChangeType);
 const ROOT_SCAN_EXCLUDES = new Set([
   '.bmc', 'src', 'context.json', 'package.json',
   'package-lock.json', 'jsconfig.json', 'index.d.ts', 'endpoint.d.ts',
-  'mcp.d.ts',
+  'mcp.d.ts', 'whatsappflow.d.ts', 'webchatforms.d.ts', 'flowstate.json',
+  // Written by the flow/form runner, not client actions.
+  'chat.json', 'catalog.json',
   'README.md', 'node_modules', '.vscode', '.git', '.gitignore',
 ]);
 
