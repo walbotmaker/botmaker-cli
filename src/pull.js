@@ -3,6 +3,7 @@ const path = require('path');
 const util = require('util');
 const fs = require('fs');
 const chalk = require('chalk');
+const { __ } = require('./i18n');
 
 const { getBmc, saveBmc } = require('./bmcConfig');
 const getWorkspacePath = require('./getWorkspacePath');
@@ -41,16 +42,16 @@ const makeChanges = async (wpPath, cas, status, changes) => {
     return cas;
   }
   if (removeLocal && hasIncomingChanges) {
-    console.log(chalk.bgRed(`WARNING: ${status.name} has incoming changes but was deleted locally`))
+    console.log(chalk.bgRed(__('WARNING: %s has incoming changes but was deleted locally', status.name)))
     return cas;
   }
   if (hasLocalChanges && removeRemote) {
-    console.log(chalk.bgRed(`WARNING: ${path.join(wpPath, status.fn)} has local changes but was deleted remotly.`));
+    console.log(chalk.bgRed(__('WARNING: %s has local changes but was deleted remotely.', path.join(wpPath, status.fn))));
     return cas;
   }
 
   if (removeRemote) {
-    console.log(chalk.red(`${path.join(wpPath, status.fn)} was deleted`));
+    console.log(chalk.red(__('%s was deleted', path.join(wpPath, status.fn))));
     await rm(path.join(wpPath, status.fn))
     return cas.filter(ca => ca.id !== status.id);
 
@@ -61,9 +62,9 @@ const makeChanges = async (wpPath, cas, status, changes) => {
     const { conflict, result } = getDiff.getMerge(local, original, remote);
 
     if (conflict) {
-      console.log(chalk.bgRed(`WARNING: ${path.join(wpPath, status.fn)} has merge conflicts`));
+      console.log(chalk.bgRed(__('WARNING: %s has merge conflicts', path.join(wpPath, status.fn))));
     } else {
-      console.log(chalk.yellow(`WARNING: ${path.join(wpPath, status.fn)} was merged automatically`));
+      console.log(chalk.yellow(__('WARNING: %s was merged automatically', path.join(wpPath, status.fn))));
     }
     await writeFile(path.join(wpPath, status.fn), result, 'UTF-8');
   } else if (hasIncomingChanges) {
@@ -75,21 +76,21 @@ const makeChanges = async (wpPath, cas, status, changes) => {
       const wantedRel = nameToRelPath(status.T, status.N);
       if (wantedRel !== status.fn) {
         await moveLocalFile(wpPath, status.fn, wantedRel);
-        console.log(chalk.green(`${status.fn} moved to ${wantedRel}`));
+        console.log(chalk.green(__('%s moved to %s', status.fn, wantedRel)));
         status.fn = wantedRel;
       }
-      console.log(chalk.green(`${path.join(wpPath, status.fn)} has changes`));
+      console.log(chalk.green(__('%s has changes', path.join(wpPath, status.fn))));
       await writeFile(path.join(wpPath, status.fn), newVersion, 'UTF-8');
     } else {
       // CA was tracked in .bmc but the local file was missing — re-create it.
       const newFileName = await createNewFile(wpPath, status, newVersion);
       status.fn = newFileName;
-      console.log(chalk.green(`${path.join(wpPath, status.fn)} was added`));
+      console.log(chalk.green(__('%s was added', path.join(wpPath, status.fn))));
     }
   } else if (wasAdded) {
     const newVersion = status.U || status.P;
     const newFileName = await createNewFile(wpPath, status, newVersion);
-    console.log(chalk.green(`${path.join(wpPath, newFileName)} was added`));
+    console.log(chalk.green(__('%s was added', path.join(wpPath, newFileName))));
     return cas.concat({
       publishedCode: status.P,
       unPublishedCode: status.U,
@@ -122,7 +123,7 @@ const singlePull = async (pwd, caName) => {
   const { changes, status } = await getStatus.getSingleStatusChanges(pwd, caName);
   const newCas = await makeChanges(wpPath, cas, status, changes);
   if(newCas === cas) {
-    console.log(chalk.green('Already up to date. :)'));
+    console.log(chalk.green(__('Already up to date. :)')));
     return false;
   }
   await saveBmc(wpPath, token, newCas);
@@ -141,7 +142,7 @@ const completePull = async (pwd) => {
     withMerges = withMerges || hasMerge(changes);
   }
   if(newCas === cas) {
-    console.log(chalk.green('Already up to date. :)'));
+    console.log(chalk.green(__('Already up to date. :)')));
     return false;
   }
   await saveBmc(wpPath, token, newCas);

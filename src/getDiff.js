@@ -3,6 +3,7 @@ const getStatus = require("./getStatus");
 const getWorkspacePath = require("./getWorkspacePath");
 const diff = require("diff");
 const chalk = require('chalk');
+const { __ } = require('./i18n');
 const path = require('path');
 const util = require('util');
 const fs = require('fs');
@@ -29,7 +30,7 @@ const lineCounter = (text) => {
 
 const openChanges = async (compare, state, caName) => {
   if (!compare) {
-    console.log("No changes");
+    console.log(__('No changes'));
     return;
   }
   const tmpFileId1    = utils.makeid(5);
@@ -83,7 +84,7 @@ const showChanges = (compare) => {
   const f1 = compare[0] || "";
   const f2 = compare[1] || "";
   if(f1 === f2) {
-    console.log(chalk.green('They are equals.'));
+    console.log(chalk.green(__('They are equal.')));
     return;
   }
   const maxLines = Math.max(lineCounter(f1), lineCounter(f2));

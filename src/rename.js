@@ -1,4 +1,5 @@
 const chalk = require('chalk');
+const { __ } = require('./i18n');
 const getStatus = require("./getStatus");
 const {ChangeType} = getStatus;
 const { getBmc, saveBmc } = require('./bmcConfig');
@@ -24,16 +25,16 @@ const rename = async (pwd, caName, newName) => {
   const wpPath = await getWorkspacePath(pwd);
   const { changes, status } = await getStatus.getSingleStatusChanges(pwd, caName);
   if (hasIncomingChanges(changes)){
-    throw new Error('There is incoming changes. You must make a pull first.');
+    throw new Error(__('There is incoming changes. You must make a pull first.'));
   }
   if (!newName || caName == newName) {
-    console.log(chalk.green('You need to provide a new name por the client action.'))
+    console.log(chalk.green(__('You need to provide a new name for the client action.')))
     return;
   }
   const { token, cas } = await getBmc(wpPath);
   const codeAction = await getCaByNameOrPath(wpPath, cas, caName);
   if (!codeAction || !codeAction.id) {
-    throw new Error('The client action was not uploaded.');
+    throw new Error(__('The client action was not uploaded.'));
   }
   // The new name can carry folders, so renaming is also how you move a client
   // action. What it cannot do is cross into another type's folder.
@@ -43,7 +44,7 @@ const rename = async (pwd, caName, newName) => {
   const toUpdate = [{id:codeAction.id, name : remoteName}];
   await updateCas(token,toUpdate);
   await moveLocalFile(wpPath, codeAction.filename, newFileName);
-  console.log(chalk.green(`Changed ${caName} name to ${remoteName}.`))
+  console.log(chalk.green(__('Changed %s name to %s.', caName, remoteName)))
   const newCas = cas.map( ca =>
     codeAction.id === ca.id ? {...ca, name: remoteName, filename: newFileName} : ca
   );

@@ -12,6 +12,7 @@ const {
   TYPE_FOLDERS,
 } = require('./caTypes');
 const { reconcileWorkspace } = require('./reconcile');
+const { __ } = require('./i18n');
 
 const readFile = util.promisify(fs.readFile);
 const exists = util.promisify(fs.exists);
@@ -53,70 +54,70 @@ class ChangeStatusType {
 
 const ChangeType = {
   UNPUBLISHED: new ChangeStatusType(
-    "Is unpublished",
+    __('Is unpublished'),
     'Un',
     '!XU',
     'blue',
     (s) => [s.U, s.P]
   ),
   NOT_ADDED: new ChangeStatusType(
-    "Not added",
+    __('Not added'),
     'Na',
     'XP Xp !Xf',
     'red',
     (s) => [null, s.f]
   ),
   REMOVE_REMOTE: new ChangeStatusType(
-    "Remove remote",
+    __('Remove remote'),
     'Rr',
     'XP !Xp',
     'bgRed',
     (s) => [s.p, null]
   ),
   REMOVE_LOCAL: new ChangeStatusType(
-    "Remove local",
+    __('Remove local'),
     'Rl',
     '!XP !Xp Xf',
     'red',
     (s) => [s.P, null]
   ),
   LOCAL_CHANGES: new ChangeStatusType(
-    "Local changes",
+    __('Local changes'),
     'Lc',
     ['!Xu !uf', '!Xp Xu !pf'],
     'cyan',
     (s) => s.u && s.u !== s.f ? [s.u, s.f] : [s.p, s.f]
   ),
   NEW_VERSION: new ChangeStatusType(
-    "New version was published",
+    __('New version was published'),
     'Nv',
     '!XP !Xp !Pp',
     'magenta',
     (s) => [s.p, s.P]
   ),
   INCOMING_CHANGES: new ChangeStatusType(
-    "Incoming changes",
+    __('Incoming changes'),
     'In',
     ['!XP !Xp Xu !Pp', '!XP !Xp !Uu'],
     'yellow',
     (s) => s.U ? [s.u || s.p, s.U] : [s.p, s.P]
   ),
   RENAMED: new ChangeStatusType(
-    "Renamed",
+    __('Renamed'),
     'Rn',
     '!XP !Xp !Nn',
     'yellow',
     (s) => [s.n, s.N]
   ),
   LOCAL_MOVED: new ChangeStatusType(
-    "Moved locally",
+    __('Moved locally'),
     'Mv',
     '!XM !Xm !Mm',
     'yellow',
     (s) => [s.m, s.M]
   ),
   TYPE_CHANGED: new ChangeStatusType(
-    "Type changed",
+    __('Type changed'),
     'Tc',
     '!XP !Xp !Tt',
     'red',
@@ -264,7 +265,7 @@ const getCaByNameOrPath = async (wpPath, cas, caName) => {
     const relative = path.relative(wpPath, nonAdded).split(path.sep).join('/');
     return { filename: relative }
   }
-  throw new Error(`'${caName}' not found`);
+  throw new Error(__("'%s' not found", caName));
 }
 
 const getLocalStatus = async (wpPath, ca, resolved) => {
@@ -293,7 +294,7 @@ const getLocalStatus = async (wpPath, ca, resolved) => {
       filePath = path.join(wpPath, actualRel);
       existFile = true;
     } else if (matches.length > 1) {
-      console.log(chalk.yellow(`WARNING: multiple files match basename '${basename}' under ${searchRoot}; keeping cached path for '${ca.name}'`));
+      console.log(chalk.yellow(__("WARNING: multiple files match basename '%s' under %s; keeping cached path for '%s'", basename, searchRoot, ca.name)));
     }
 
     // Last resort: the file was moved and renamed at once, so neither the
@@ -301,7 +302,7 @@ const getLocalStatus = async (wpPath, ca, resolved) => {
     // content instead.
     const adopted = resolved && resolved.exact.get(ca.id);
     if (!existFile && adopted) {
-      console.log(chalk.cyan(`'${ca.name}' was moved to ${adopted}`));
+      console.log(chalk.cyan(__("'%s' was moved to %s", ca.name, adopted)));
       actualRel = adopted;
       filePath = path.join(wpPath, actualRel);
       existFile = true;
@@ -310,7 +311,7 @@ const getLocalStatus = async (wpPath, ca, resolved) => {
 
   const f = existFile ? await readFile(filePath, 'UTF-8') : null;
   if (f && f.search(/(^<<<<<<<|^========|^>>>>>>>)/gm) !== -1) {
-    throw new Error(`The file ${filePath} has unresolved merge conflicts`);
+    throw new Error(__('The file %s has unresolved merge conflicts', filePath));
   }
   const p = ca.publishedCode != null ? ca.publishedCode : null;
   const u = ca.unPublishedCode != null ? ca.unPublishedCode : null;
@@ -374,7 +375,7 @@ const getStatusData = async (wpPath, ca, remoteOrToken, resolved) => {
 
 const getChangeByCode = (code, status) => {
   if (typeof code !== "string" || code.length !== 2) {
-    throw new Error("Invalid diff code. Must be 2 caracters");
+    throw new Error(__('Invalid diff code. Must be 2 characters'));
   }
   const posibleChange = posibleChanges.find(p => p.short === code);
   if (!posibleChange) {
@@ -462,7 +463,7 @@ const getStatus = async (pwd, caName) => {
       showChanges(statusChange.changes, statusChange.status);
       statusChange.changes.forEach((c) => changesSet.add(c))
     };
-    console.log("\nDescription:");
+    console.log('\n' + __('Description:'));
     showChanges([...changesSet]);
   }
 };

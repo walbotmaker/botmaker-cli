@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { getAllCas, getCustomerContext } = require('./bmService')
 const { formatName, nameToRelPath, extensionFor } = require('./caPaths');
 const fse = require('fs-extra');
+const { __ } = require('./i18n');
 const { saveBmc, saveContext } = require('./bmcConfig');
 
 const readFile = util.promisify(fs.readFile);
@@ -20,7 +21,7 @@ const getName = async (folder, basename, extension, num) => {
   const finalPath = path.join(folder, finalName);
   const isTaken = await exists(finalPath);
   if (isTaken && num > 100) {
-    throw new Error(`could not found a space for '${basename}'`);
+    throw new Error(__("could not find a free name for '%s'", basename));
   } else if (isTaken) {
     const nextNum = num !== undefined ? num + 1 : 0;
     return getName(folder, basename, extension, nextNum);
@@ -32,37 +33,37 @@ const getName = async (folder, basename, extension, num) => {
 const importWorkspace = async (pwd, apiToken) => {
   const decode = jwt.decode(apiToken)
   if (!decode) {
-    console.error("bmc: Invalid jwt token. Please generate a api token from https://go.botmaker.com/#/platforms in 'Botmaker API - Credenciales'");
-    throw new Error('Invalid jwt token');
+    console.error('bmc: ' + __("Invalid jwt token. Please generate an api token from https://go.botmaker.com/#/platforms in 'Botmaker API - Credenciales'"));
+    throw new Error(__('Invalid jwt token'));
   }
   const { businessId } = decode;
   const workspacePath = path.join(pwd, businessId);
   if (await exists(workspacePath)) {
-    throw new Error(`cannot create directory ‘${path.join(pwd, businessId)}’: File exists`)
+    throw new Error(__('cannot create directory ‘%s’: File exists', path.join(pwd, businessId)))
   }
 
-  console.log("looking for context...");
+  console.log(__('looking for context...'));
   const contextReq = await (async () => {
     try {
       return await getCustomerContext(apiToken);
     } catch (e) {
-      console.error("Cound not found a context. Please check if exist some chat for the business " + businessId)
+      console.error(__('Could not find a context. Please check if some chat exists for the business %s', businessId))
       throw e;
     }
   })();
   const context = JSON.parse(contextReq.body)
 
-  console.log("looking for client actions...");
+  console.log(__('looking for client actions...'));
   const casReq = await (async () => {
     try {
       return await getAllCas(apiToken);
     } catch (e) {
-      console.error("Cound obtain the client actions.")
+      console.error(__('Could not obtain the client actions.'))
       throw e;
     }
   })();
   const cas = JSON.parse(casReq.body)
-  console.log("creating workspace...");
+  console.log(__('creating workspace...'));
 
   await mkdir(workspacePath);
   const bmcPath = path.join(__dirname, '..');

@@ -1,3 +1,5 @@
+// Messages are asserted verbatim, so they must not follow the machine's locale.
+process.env.BMC_LANG = 'en';
 const test = require('node:test');
 const assert = require('node:assert');
 const { formatSegment, formatName, nameToRelPath } = require('../src/caPaths');

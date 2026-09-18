@@ -179,3 +179,35 @@ WHATSAPP_FLOW and WEBCHAT_FORM CAs can call `saveScreenData()` to persist payloa
 To force a fresh fetch from the API, delete `chat.json` or `catalog.json`. To restart a flow from the beginning, set `flowstate.json` back to `INIT` by hand — the `bmc reset` command no longer exists.
 
 ---
+
+## Language
+
+The CLI speaks English, Spanish, Portuguese and French. It picks the language
+from your environment — `BMC_LANG` first, then `LC_ALL`, `LC_MESSAGES` and
+`LANG` — and falls back to English for anything else.
+
+```bash
+bmc status              # follows your system
+BMC_LANG=pt bmc status  # just this once
+export BMC_LANG=es      # for the session
+```
+
+Two things stay in English on purpose: the short change codes (`Lc`, `Rn`, …),
+because you type them into `bmc diff <name> <code>`, and the JSON that
+`bmc run` prints for an MCP client action, because it is read by machines.
+
+### Adding or changing a message
+
+Messages live in `locales/<lang>.json`, keyed by their English text. Wrap a new
+one in `__()`:
+
+```js
+const { __ } = require('./i18n');
+console.log(__('%s was added', filePath));
+```
+
+then run `node scripts/extract-locales.js` to add the key to every catalog and
+fill in the translations. The test suite fails if a catalog is out of step with
+the code, so a new message cannot silently ship untranslated.
+
+---

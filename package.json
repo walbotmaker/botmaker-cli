@@ -39,6 +39,7 @@
     "secure-random": "^1.1.1",
     "ts-morph": "^27.0.2",
     "xml2js": "^0.6.2",
+    "y18n": "^5.0.8",
     "yargs": "^16.2.0"
   },
   "repository": {
