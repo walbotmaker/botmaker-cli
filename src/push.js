@@ -9,6 +9,9 @@ const { updateCas } = require("./bmService");
 const chalk = require("chalk");
 const publish = require('./publish');
 const { movedName } = require('./caPaths');
+const { askYesNo } = require('./confirm');
+
+const readFile = util.promisify(fs.readFile);
 
 const {ChangeType} = getStatus;
 const maxLength = 100000;
@@ -40,6 +43,31 @@ const getPushChanges = (status, changes) => {
   payload.unPublishedCode = status.f;
   return { payload, fn: status.fn };
 }
+
+// Points the status at the file the reconciliation found, once a person said
+// it is the same client action. m keeps the cached path so the move still shows.
+const adoptProbableMove = (status, content) => {
+  status.f = content;
+  status.fn = status.probableMove.relPath;
+  status.M = status.probableMove.relPath;
+  delete status.probableMove;
+};
+
+// A file that was moved, renamed and edited at once matches nothing exactly, so
+// the CLI will not adopt it on its own — pushing it would rename a client action
+// on the platform off a guess. Ask instead.
+const resolveProbableMove = async (wpPath, status) => {
+  if (!status.probableMove) return false;
+  const { relPath, score } = status.probableMove;
+  const percent = Math.round(score * 100);
+  console.log(chalk.yellow(
+    `'${status.n}' is missing from ${status.m}, and ${relPath} looks ${percent}% like it.`
+  ));
+  const yes = await askYesNo(chalk.yellow(`Treat ${relPath} as '${status.n}' and rename it on the platform?`));
+  if (!yes) return false;
+  adoptProbableMove(status, await readFile(path.join(wpPath, relPath), 'UTF-8'));
+  return true;
+};
 
 // One entry per client action whose file no longer sits where .bmc says it is.
 // Moving a folder is just every client action under it moving at once, so there
@@ -101,9 +129,12 @@ const applyToCas = (cas, updates) => cas.map(ca => {
 
 const singlePush = async (pwd, caName) => {
   const wpPath = await getWorkspacePath(pwd)
-  const { changes, status } = await getStatus.getSingleStatusChanges(pwd, caName);
+  let { changes, status } = await getStatus.getSingleStatusChanges(pwd, caName);
   if (hasIncomingChanges(changes)){
     throw new Error('There is incoming changes. You must make a pull first.');
+  }
+  if (await resolveProbableMove(wpPath, status)) {
+    changes = getStatus.getChangesFromStatus(status);
   }
   const { token, cas } = await getBmc(wpPath);
   const pushChanges = getPushChanges(status, changes);
@@ -128,9 +159,13 @@ const completePush = async (pwd) => {
   const entries = [];
   const statuses = [];
   for await (let statucChanges of changesGenerator) {
-    const { status, changes } = statucChanges;
+    const { status } = statucChanges;
+    let { changes } = statucChanges;
     if (hasIncomingChanges(changes)){
       throw new Error('There is incoming changes you must make an pull first.');
+    }
+    if (await resolveProbableMove(wpPath, status)) {
+      changes = getStatus.getChangesFromStatus(status);
     }
     statuses.push(status);
     const pushChanges = getPushChanges(status, changes);
@@ -174,6 +209,7 @@ const push = async (pwd, caName, forPublish) => {
 
 push.collectMoveUpdates = collectMoveUpdates;
 push.getPushChanges = getPushChanges;
+push.adoptProbableMove = adoptProbableMove;
 push.mergePushEntries = mergePushEntries;
 
 module.exports = push;

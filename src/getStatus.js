@@ -11,6 +11,7 @@ const {
   extractBasename,
   TYPE_FOLDERS,
 } = require('./caTypes');
+const { reconcileWorkspace } = require('./reconcile');
 
 const readFile = util.promisify(fs.readFile);
 const exists = util.promisify(fs.exists);
@@ -266,7 +267,7 @@ const getCaByNameOrPath = async (wpPath, cas, caName) => {
   throw new Error(`'${caName}' not found`);
 }
 
-const getLocalStatus = async (wpPath, ca) => {
+const getLocalStatus = async (wpPath, ca, resolved) => {
   if (!ca.filename) {
     return {
       p: null, t: null, f: null, u: null, n: null, id: ca.id, fn: null,
@@ -294,6 +295,17 @@ const getLocalStatus = async (wpPath, ca) => {
     } else if (matches.length > 1) {
       console.log(chalk.yellow(`WARNING: multiple files match basename '${basename}' under ${searchRoot}; keeping cached path for '${ca.name}'`));
     }
+
+    // Last resort: the file was moved and renamed at once, so neither the
+    // cached path nor the basename finds it. reconcileWorkspace matched it by
+    // content instead.
+    const adopted = resolved && resolved.exact.get(ca.id);
+    if (!existFile && adopted) {
+      console.log(chalk.cyan(`'${ca.name}' was moved to ${adopted}`));
+      actualRel = adopted;
+      filePath = path.join(wpPath, actualRel);
+      existFile = true;
+    }
   }
 
   const f = existFile ? await readFile(filePath, 'UTF-8') : null;
@@ -307,7 +319,11 @@ const getLocalStatus = async (wpPath, ca) => {
   const id = ca.id != null ? ca.id : null;
   // m is where .bmc says the file is, M is where it actually sits. They differ
   // when someone moved the file or a whole folder in the editor.
-  return { p, t, f, u, n, id, fn: actualRel, m: cachedRel, M: actualRel };
+  const maybe = resolved && resolved.probable.get(ca.id);
+  return {
+    p, t, f, u, n, id, fn: actualRel, m: cachedRel, M: actualRel,
+    ...(maybe && !existFile ? { probableMove: maybe } : {}),
+  };
 }
 
 const NO_REMOTE = { P: null, U: null, N: null, T: null }
@@ -344,8 +360,8 @@ const findRemoteStatus = (remotesCas, id) => {
   }
 }
 
-const getStatusData = async (wpPath, ca, remoteOrToken) => {
-  const localStatus = await getLocalStatus(wpPath, ca);
+const getStatusData = async (wpPath, ca, remoteOrToken, resolved) => {
+  const localStatus = await getLocalStatus(wpPath, ca, resolved);
   const remoteStatus = typeof remoteOrToken === 'string'
     ? await getRemoteStatus(remoteOrToken, ca.id)
     : Array.isArray(remoteOrToken)
@@ -390,7 +406,8 @@ const getSingleStatusChanges = async (pwd, caName) => {
   if (!matchedCa){
 
   }
-  const status = await getStatusData(wpPath, matchedCa, token);
+  const resolved = await reconcileWorkspace(wpPath, cas);
+  const status = await getStatusData(wpPath, matchedCa, token, resolved);
   const changes = getChangesFromStatus(status)
   return { changes, status };
 }
@@ -401,11 +418,16 @@ async function* getStatusChanges(pwd) {
   const remoteCasRes = await getAllCas(token);
   const remoteCas = JSON.parse(remoteCasRes.body);
   const newCas = remoteCas.filter(rca => cas.every(lca => lca.id !== rca.id));
+  const resolved = await reconcileWorkspace(wpPath, cas);
   const allLocalFiles = [];
   for await (const f of walkAllLocalCaFiles(wpPath, cas)) {
     allLocalFiles.push(f);
   }
-  const newLocalCasFiles = allLocalFiles.filter(filename => cas.every(lca => lca.filename !== filename));
+  // A file adopted by content belongs to a client action already, so it must
+  // not also be reported as an untracked file.
+  const adoptedFiles = new Set(resolved.exact.values());
+  const newLocalCasFiles = allLocalFiles.filter(filename =>
+    !adoptedFiles.has(filename) && cas.every(lca => lca.filename !== filename));
   const newLocalCas = newLocalCasFiles.map(filename => ({ filename }))
   const allCas = [...cas, ...newCas, ...newLocalCas].sort((ca1, ca2) => {
     const c1 = ca1.name || ca1.filename;
@@ -413,7 +435,7 @@ async function* getStatusChanges(pwd) {
     return c1.localeCompare(c2);
   });
   for (let ca of allCas) {
-    const status = await getStatusData(wpPath, ca, remoteCas);
+    const status = await getStatusData(wpPath, ca, remoteCas, resolved);
     const changes = getChangesFromStatus(status);
     yield { changes, status }
   }

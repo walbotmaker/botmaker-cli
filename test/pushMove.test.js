@@ -90,3 +90,21 @@ test('a normal code change still pushes', () => {
   const result = getPushChanges(status, [ChangeType.LOCAL_CHANGES]);
   assert.deepStrictEqual(result, { payload: { id: '1', unPublishedCode: 'nuevo' }, fn: 'src/user/a.js' });
 });
+
+const { adoptProbableMove } = require('../src/push');
+
+test('accepting a probable move makes the status point at the found file', () => {
+  const status = {
+    id: '1', n: 'a', f: null, fn: 'src/user/viejo.js', m: 'src/user/viejo.js',
+    M: 'src/user/viejo.js', p: 'CODE', u: null,
+    probableMove: { relPath: 'src/user/nuevo.js', score: 0.8 },
+  };
+
+  adoptProbableMove(status, 'CODE EDITADO');
+
+  assert.strictEqual(status.f, 'CODE EDITADO', 'the file content becomes the local code');
+  assert.strictEqual(status.fn, 'src/user/nuevo.js');
+  assert.strictEqual(status.M, 'src/user/nuevo.js', 'M is where the file really is');
+  assert.strictEqual(status.m, 'src/user/viejo.js', 'm stays as the cached path, so the move is still visible');
+  assert.strictEqual(status.probableMove, undefined, 'it is no longer pending');
+});
