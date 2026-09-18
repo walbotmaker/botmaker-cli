@@ -50,9 +50,17 @@ client action inside it moving at once.
 Two rules the CLI enforces:
 
 - A file cannot be moved into another type's folder. Moving a file never
-  changes a client action's type, so `bmc push` refuses the whole push and
-  tells you which file is misplaced.
+  changes a client action's type, so `bmc push` offers to move it back and
+  refuses the whole push if you decline. It lists every misplaced file at once,
+  not one per run.
 - The same file name in two different folders is fine.
+
+If you move and rename a file at the same time, the CLI still finds it: it
+matches the file by content, the way git detects renames. An exact match to the
+published code or to your draft is followed silently; something merely similar
+is reported and `bmc push` asks before renaming anything on the platform. With
+no interactive terminal — CI, a piped command — nothing is ever assumed: the
+push stops and tells you what it found.
 
 ---
 

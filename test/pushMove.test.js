@@ -151,3 +151,22 @@ test('a single blocker keeps its own message, with no list wrapper', () => {
 test('no blockers means nothing to throw', () => {
   assert.strictEqual(combineBlockers([]), null);
 });
+
+const { adoptRestoredFile } = require('../src/push');
+
+test('putting a misplaced file back leaves the status ready to push', () => {
+  const status = {
+    id: '1', n: 'SelectedProduct', t: 'USER', f: null,
+    fn: 'src/user/selectedproduct.js', m: 'src/user/selectedproduct.js',
+    M: 'src/user/selectedproduct.js', p: 'CODE', u: null,
+    misplacedAt: 'src/whatsappflow/selectedproduct.js',
+  };
+
+  adoptRestoredFile(status, 'CODE');
+
+  assert.strictEqual(status.misplacedAt, undefined, 'it no longer blocks the push');
+  assert.strictEqual(status.f, 'CODE', 'the code is readable again');
+  assert.strictEqual(status.fn, 'src/user/selectedproduct.js');
+  assert.strictEqual(status.M, 'src/user/selectedproduct.js', 'it is back where .bmc says, so this is not a move');
+  assert.strictEqual(status.m, 'src/user/selectedproduct.js');
+});
