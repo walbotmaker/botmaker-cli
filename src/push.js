@@ -26,8 +26,18 @@ const getPushChanges = (status, changes) => {
     return;
   }
 
+  // No local file means f is null, and null differs from the published code,
+  // so LOCAL_CHANGES fires even though there is nothing to send. Pushing it
+  // would overwrite the client action with empty code, so stop instead.
+  if (status.f == null) {
+    throw new Error(
+      `'${status.n}' has no local file at '${status.fn}'. Run 'bmc pull' to bring ` +
+      `it back, or move the file to that path. Pushing now would send empty code.`
+    );
+  }
+
   const payload = { id: status.id };
-  if (hasLocalCode) payload.unPublishedCode = status.f;
+  payload.unPublishedCode = status.f;
   return { payload, fn: status.fn };
 }
 
@@ -163,6 +173,7 @@ const push = async (pwd, caName, forPublish) => {
 };
 
 push.collectMoveUpdates = collectMoveUpdates;
+push.getPushChanges = getPushChanges;
 push.mergePushEntries = mergePushEntries;
 
 module.exports = push;

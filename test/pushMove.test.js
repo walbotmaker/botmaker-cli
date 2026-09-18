@@ -66,3 +66,27 @@ test('renaming across folders is just a new path for the same client action', ()
   assert.strictEqual(relPathToName(ca.type, target), 'user/stock/nuevo');
   assert.throws(() => assertNoForeignTypePrefix('USER', 'mcp/nuevo'), /another client action type/);
 });
+
+const getPushChanges = require('../src/push').getPushChanges;
+const { ChangeType } = require('../src/getStatus');
+
+test('a client action whose local file is gone is refused, not pushed as empty code', () => {
+  // The file was moved or deleted, so f is null. LOCAL_CHANGES still fires
+  // because null differs from the published code — pushing that would send
+  // empty code to the platform.
+  const status = {
+    id: '1', n: 'Test A/B', f: null, fn: 'src/user/test_a/b.js',
+    p: 'const main = ...', u: null,
+  };
+  const changes = [ChangeType.REMOVE_LOCAL, ChangeType.LOCAL_CHANGES];
+
+  assert.throws(() => getPushChanges(status, changes), /has no local file/);
+});
+
+test('a normal code change still pushes', () => {
+  const status = {
+    id: '1', n: 'a', f: 'nuevo', fn: 'src/user/a.js', p: 'viejo', u: null,
+  };
+  const result = getPushChanges(status, [ChangeType.LOCAL_CHANGES]);
+  assert.deepStrictEqual(result, { payload: { id: '1', unPublishedCode: 'nuevo' }, fn: 'src/user/a.js' });
+});
