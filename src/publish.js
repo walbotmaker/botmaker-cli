@@ -4,6 +4,7 @@ const { getBmc, saveBmc } = require('./bmcConfig');
 const getWorkspacePath = require('./getWorkspacePath');
 const { publishCa } = require("./bmService");
 const chalk = require("chalk");
+const { __ } = require('./i18n');
 
 const {ChangeType} = getStatus;
 
@@ -34,13 +35,13 @@ const publish = async (pwd, caName) => {
   const { changes, status } = await getStatus.getSingleStatusChanges(pwd, caName);
 
   if (hasIncomingChanges(changes)){
-    throw new Error('There is incoming changes. You must make a pull first.');
+    throw new Error(__('There is incoming changes. You must make a pull first.'));
   }
   if (hasLocalChanges(changes)){
-    throw new Error('There is local changes. You must make a push first.');
+    throw new Error(__('There is local changes. You must make a push first.'));
   }
   if (!isUnpublish(changes)){
-    console.log(chalk.green('Nothing to publish!'))
+    console.log(chalk.green(__('Nothing to publish!')))
     return;
   }
   

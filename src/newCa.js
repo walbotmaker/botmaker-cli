@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const fse = require('fs-extra');
 const chalk = require('chalk');
+const { __ } = require('./i18n');
 const exec = require('child_process').exec;
 
 const CaType = require('./caTypes');
@@ -112,7 +113,7 @@ const createFileAndStatus = async (wpPath, ca, type, openVsCode) => {
 
   const filePath = path.join(wpPath, newFileName);
   await writeFile(filePath, ca.publishedCode, 'UTF-8');
-  console.log(chalk.green(`${filePath} was added`));
+  console.log(chalk.green(__('%s was added', filePath)));
   if(openVsCode){
     exec(`code "${filePath}"`);
   }
@@ -125,7 +126,7 @@ const createFileAndStatus = async (wpPath, ca, type, openVsCode) => {
 const newCa = async (pwd, caName, type, openVsCode = false, schedule = null) => {
   if (schedule != null) {
     if (!isValidCron(schedule, { seconds: false })) {
-      throw new Error(`Invalid cron expression: "${schedule}". Expected a valid 5-field cron string (e.g. "0 * * * *").`);
+      throw new Error(__('Invalid cron expression: "%s". Expected a valid 5-field cron string (e.g. "0 * * * *").', schedule));
     }
   }
   assertNoForeignTypePrefix(type, caName);

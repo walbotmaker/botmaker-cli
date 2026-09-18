@@ -1,4 +1,5 @@
 const CaType = require('./caTypes');
+const { __ } = require('./i18n');
 const { getTypeFolder, TYPE_FOLDERS } = require('./caTypes');
 
 // One path segment, cleaned up so it is safe as a file or folder name.
@@ -40,7 +41,7 @@ const nameToRelPath = (type, name) => {
   const raw = String(name || '').split('/').filter(Boolean);
   const segments = stripTypePrefix(type, raw).map(formatSegment).filter(Boolean);
   if (segments.length === 0) {
-    throw new Error(`Client action name '${name}' has no usable segments.`);
+    throw new Error(__("Client action name '%s' has no usable segments.", name));
   }
   const file = `${segments.join('/')}.${extensionFor(type)}`;
   const typeFolder = getTypeFolder(type);
@@ -79,10 +80,9 @@ class CrossTypeMoveError extends Error {
     const swapped = withTypeFolder(ca.type, actualRel);
     const insideFolders = swapped && swapped.split('/').length > 3;
     super(
-      `'${ca.name}' is a ${ca.type} client action but its file now sits at ` +
-      `'${actualRel}'. Move it anywhere under '${home}'` +
-      (insideFolders ? ` — '${swapped}' would keep the folders you made` : '') +
-      `, then push again. Moving a file cannot change a client action's type.`
+      __("'%s' is a %s client action but its file now sits at '%s'. Move it anywhere under '%s'", ca.name, ca.type, actualRel, home) +
+      (insideFolders ? __(" — '%s' would keep the folders you made", swapped) : '') +
+      __(", then push again. Moving a file cannot change a client action's type.")
     );
     this.name = 'CrossTypeMoveError';
     this.ca = ca;
@@ -121,8 +121,7 @@ const assertNoForeignTypePrefix = (type, name) => {
   const typeFolder = getTypeFolder(type);
   if (first && first !== typeFolder && TYPE_FOLDER_SET.has(first)) {
     throw new Error(
-      `'${name}' starts with '${first}', which is the folder of another client ` +
-      `action type. A ${type} client action cannot live there.`
+      __("'%s' starts with '%s', which is the folder of another client action type. A %s client action cannot live there.", name, first, type)
     );
   }
 };

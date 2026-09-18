@@ -1,4 +1,5 @@
 const chalk = require('chalk');
+const { __ } = require('./i18n');
 const { isValidCron } = require('cron-validator');
 const { getBmc, saveBmc } = require('./bmcConfig');
 const getWorkspacePath = require('./getWorkspacePath');
@@ -8,7 +9,7 @@ const CaType = require('./caTypes');
 
 const setSchedule = async (pwd, caName, cronString) => {
   if (!isValidCron(cronString, { seconds: false })) {
-    throw new Error(`Invalid cron expression: "${cronString}". Expected a valid 5-field cron string (e.g. "0 * * * *").`);
+    throw new Error(__('Invalid cron expression: "%s". Expected a valid 5-field cron string (e.g. "0 * * * *").', cronString));
   }
 
   const wpPath = await getWorkspacePath(pwd);
@@ -16,11 +17,11 @@ const setSchedule = async (pwd, caName, cronString) => {
   const codeAction = await getCaByNameOrPath(wpPath, cas, caName);
 
   if (!codeAction || !codeAction.id) {
-    throw new Error('The client action was not uploaded.');
+    throw new Error(__('The client action was not uploaded.'));
   }
 
   if (codeAction.type !== CaType.SCHEDULE) {
-    throw new Error(`'${caName}' is not a SCHEDULE type client action.`);
+    throw new Error(__("'%s' is not a SCHEDULE type client action.", caName));
   }
 
   await updateCas(token, [{ id: codeAction.id, schedule: cronString }]);
@@ -30,7 +31,7 @@ const setSchedule = async (pwd, caName, cronString) => {
   );
   await saveBmc(wpPath, token, newCas);
 
-  console.log(chalk.green(`Changed schedule for '${caName}' to: ${cronString}`));
+  console.log(chalk.green(__("Changed schedule for '%s' to: %s", caName, cronString)));
 };
 
 module.exports = setSchedule;

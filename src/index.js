@@ -1,4 +1,5 @@
 const { version } = require('../package.json');
+const { __, locale } = require('./i18n');
 const getDiff = require('./getDiff');
 const newCa = require('./newCa');
 const pull = require('./pull');
@@ -18,98 +19,99 @@ const main = async (args) => {
   const pwd = process.cwd();
   const arrgs = yargs(args)
     .scriptName('bmc')
-    .usage('Usage: $0 <command> [options]')
+    .usage(__('Usage: $0 <command> [options]'))
     .command(
       ['run <source>', 'r'],
-      'Run a Botmaker Client Action Script',
+      __('Run a Botmaker Client Action Script'),
       async (yargs) => yargs
         .option('v', {
           alias: 'var',
-          describe: '<varName> <varValue> Set a context variable',
+          describe: __('<varName> <varValue> Set a context variable'),
           nargs: 2
         })
         .option('p', {
           alias: 'param',
-          describe: '<paramName> <paramValue> Set a param',
+          describe: __('<paramName> <paramValue> Set a param'),
           nargs: 2
         })
-        .option('volatile', { describe: 'Will not presist the state' })
-        .option('endpoint', { describe: 'Force to run as endpoint' })
-        .option('port <portNumber>', { describe: 'Change endpoint port number' })
+        .option('volatile', { describe: __('Will not presist the state') })
+        .option('endpoint', { describe: __('Force to run as endpoint') })
+        .option('port <portNumber>', { describe: __('Change endpoint port number') })
       ,
     )
     .command(
       ['import <apiToken>', 'i'],
-      'Import a new bussiness from a token',
+      __('Import a new business from a token'),
     )
     .command(
       ['set-customer <customerId>', 'c'],
-      'Load context for a customer',
+      __('Load context for a customer'),
     )
     .command(
       ['status [caName]', 's'],
-      'Show change status',
+      __('Show change status'),
     )
     .command(
       ['diff <caName> <code>', 'd'],
-      'Diff client actions states',
+      __('Diff client actions states'),
       (yargs) => yargs
         .option('v', {
           alias: 'vs-code',
-          describe: 'Open in vs-code',
+          describe: __('Open in vs-code'),
         })
     )
     .command(
       ['pull [caName]'],
-      'Pull incoming changes',
+      __('Pull incoming changes'),
     ).command(
       ['new <caName>', 'n'],
-      'Create a new client action',
+      __('Create a new client action'),
       (yargs) => yargs
         .option('v', {
           alias: 'vs-code',
-          describe: 'Open in vs-code',
+          describe: __('Open in vs-code'),
         }).option('e', {
           alias: 'endpoint',
-          describe: 'Create as endpoint type',
+          describe: __('Create as endpoint type'),
         }).option('a', {
           alias: 'ai-function',
-          describe: 'Create as AI function type',
+          describe: __('Create as AI function type'),
         }).option('w', {
           alias: 'whatsapp-flow',
-          describe: 'Create as WhatsApp flow type',
+          describe: __('Create as WhatsApp flow type'),
         }).option('f', {
           alias: 'webchat-form',
-          describe: 'Create as Webchat form type',
+          describe: __('Create as Webchat form type'),
         }).option('S', {
           alias: 'schedule-ca',
-          describe: '<cronExpression> Create as Schedule type with cron expression',
+          describe: __('<cronExpression> Create as Schedule type with cron expression'),
           nargs: 1,
         })
     ).command(
       ['push [caName]'],
-      'Push changes in client action',
+      __('Push changes in client action'),
       (yargs) => yargs
         .option('b', {
           alias: 'publish',
-          describe: 'Push and publish with a single command',
+          describe: __('Push and publish with a single command'),
         })
     ).command(
       ['publish <caName>'],
-      'Publish changes in client action'
+      __('Publish changes in client action')
     ).command(
       ['rename <caName> <newName>'],
-      'Renames the given client action'
+      __('Renames the given client action')
     )
     .command(
       ['set-schedule <caName> <cronString>'],
-      'Set the cron schedule on a SCHEDULE type client action'
+      __('Set the cron schedule on a SCHEDULE type client action')
     )
+    .locale(locale)
     .demandCommand()
     .help('h')
     .alias('h', 'help')
     .version(version)
-    .epilog('copyright Botmaker 2026')
+    .epilog(__('copyright Botmaker %s', '2026'))
     .argv;
 
   switch (arrgs._[0]) {
@@ -137,7 +139,7 @@ const main = async (args) => {
       const { caName: caName3, v: vsCode1, e, a, w, f, S } = arrgs;
       const typeFlagCount = [e, a, w, f, S].filter(Boolean).length;
       if (typeFlagCount > 1) {
-        throw new Error('Only one type flag may be specified at a time (-e, -a, -w, -f, -S).');
+        throw new Error(__('Only one type flag may be specified at a time (-e, -a, -w, -f, -S).'));
       }
       const newType = e ? CaType.ENDPOINT
         : a ? CaType.AI_FUNCTION

@@ -7,6 +7,7 @@ const { getBmc, saveBmc } = require('./bmcConfig');
 const getWorkspacePath = require('./getWorkspacePath');
 const { updateCas } = require("./bmService");
 const chalk = require("chalk");
+const { __ } = require('./i18n');
 const publish = require('./publish');
 const { movedName, withTypeFolder, CrossTypeMoveError } = require('./caPaths');
 const { askYesNo } = require('./confirm');
@@ -18,8 +19,8 @@ const maxLength = 100000;
 
 const checkClientActionLength = (text, caName) => {
   if (text.length > maxLength) {
-    console.log(chalk.red(`The code action ${caName} is too big. The maximum size is 100000 characters.`));
-    throw new Error(`Error trying to push changes in ${caName}`);
+    console.log(chalk.red(__('The code action %s is too big. The maximum size is %s characters.', caName, String(maxLength))));
+    throw new Error(__('Error trying to push changes in %s', caName));
   }
 }
 
@@ -41,10 +42,10 @@ const getPushChanges = (status, changes) => {
   // so LOCAL_CHANGES fires even though there is nothing to send. Pushing it
   // would overwrite the client action with empty code, so stop instead.
   if (status.f == null) {
-    throw new Error(
-      `'${status.n}' has no local file at '${status.fn}'. Run 'bmc pull' to bring ` +
-      `it back, or move the file to that path. Pushing now would send empty code.`
-    );
+    throw new Error(__(
+      "'%s' has no local file at '%s'. Run 'bmc pull' to bring it back, or move the file to that path. Pushing now would send empty code.",
+      status.n, status.fn
+    ));
   }
 
   const payload = { id: status.id };
@@ -68,10 +69,11 @@ const resolveProbableMove = async (wpPath, status) => {
   if (!status.probableMove) return false;
   const { relPath, score } = status.probableMove;
   const percent = Math.round(score * 100);
-  console.log(chalk.yellow(
-    `'${status.n}' is missing from ${status.m}, and ${relPath} looks ${percent}% like it.`
-  ));
-  const yes = await askYesNo(chalk.yellow(`Treat ${relPath} as '${status.n}' and rename it on the platform?`));
+  console.log(chalk.yellow(__(
+    "'%s' is missing from %s, and %s looks %s%% like it.",
+    status.n, status.m, relPath, String(percent)
+  )));
+  const yes = await askYesNo(chalk.yellow(__("Treat %s as '%s' and rename it on the platform?", relPath, status.n)));
   if (!yes) return false;
   adoptProbableMove(status, await readFile(path.join(wpPath, relPath), 'UTF-8'));
   return true;
@@ -84,9 +86,10 @@ const combineBlockers = (errors) => {
   if (errors.length === 0) return null;
   if (errors.length === 1) return errors[0];
   const list = errors.map(e => `  * ${e.message}`).join('\n');
-  return new Error(
-    `${errors.length} client actions block the push:\n${list}\nNothing was sent.`
-  );
+  return new Error(__(
+    '%s client actions block the push:\n%s\nNothing was sent.',
+    String(errors.length), list
+  ));
 };
 
 // One entry per client action whose file no longer sits where .bmc says it is.
@@ -151,7 +154,7 @@ const singlePush = async (pwd, caName) => {
   const wpPath = await getWorkspacePath(pwd)
   let { changes, status } = await getStatus.getSingleStatusChanges(pwd, caName);
   if (hasIncomingChanges(changes)){
-    throw new Error('There is incoming changes. You must make a pull first.');
+    throw new Error(__('There is incoming changes. You must make a pull first.'));
   }
   if (await resolveProbableMove(wpPath, status)) {
     changes = getStatus.getChangesFromStatus(status);
@@ -161,7 +164,7 @@ const singlePush = async (pwd, caName) => {
   const moves = collectMoveUpdates(cas, [status]);
   const toPush = mergePushEntries(pushChanges ? [pushChanges] : [], moves, [status]);
   if (toPush.length === 0) {
-    console.log(chalk.green('Nothing to push!. No local changes found.'))
+    console.log(chalk.green(__('Nothing to push!. No local changes found.')))
     return;
   }
   if (pushChanges && pushChanges.payload.unPublishedCode !== undefined) {
@@ -183,7 +186,7 @@ const completePush = async (pwd) => {
     const { status } = statucChanges;
     let { changes } = statucChanges;
     if (hasIncomingChanges(changes)){
-      throw new Error('There is incoming changes you must make an pull first.');
+      throw new Error(__('There is incoming changes you must make an pull first.'));
     }
     if (await resolveProbableMove(wpPath, status)) {
       changes = getStatus.getChangesFromStatus(status);
@@ -209,15 +212,15 @@ const completePush = async (pwd) => {
   const moves = collectMoveUpdates(cas, statuses);
   const toPush = mergePushEntries(entries, moves, statuses);
   if(toPush.length === 0){
-    console.log(chalk.green('Nothing to push!. No local changes found.'))
+    console.log(chalk.green(__('Nothing to push!. No local changes found.')))
     return;
   }
-  console.log(chalk.yellow('Uploading changes for:'));
+  console.log(chalk.yellow(__('Uploading changes for:')));
   toPush.forEach(update => {
     const ca = cas.find(c => c.id === update.payload.id);
     const tags = [];
     if (update.payload.unPublishedCode !== undefined) tags.push('code');
-    if (update.payload.name !== undefined) tags.push(`moved to ${update.payload.name}`);
+    if (update.payload.name !== undefined) tags.push(__('moved to %s', update.payload.name));
     console.log(chalk.yellow(` * ${chalk.italic(update.fn)} `) + chalk.grey(`${ca.name} [${tags.join(', ')}]`))
   })
   await applyPush(token, toPush.map(t => t.payload));

@@ -6,6 +6,7 @@ const caRunner = require('./caRunner');
 const path = require('path');
 const resolveRenderer = require('./resultRenderer');
 const chalk = require('chalk');
+const { __ } = require('./i18n');
 const getWorkspacePath = require('./getWorkspacePath');
 const { getBmc, getContext, saveContext } = require('./bmcConfig');
 const express = require('express');
@@ -36,14 +37,14 @@ const getCompile = async () => {
   sourceFile.replaceWithText(sourceFile.getText().replace(/import\.meta\.dirname/g, '__dirname'));
   const emitResult = project.emitToMemory();
   const jsFile = emitResult.getFiles().find(f => f.filePath.includes('tsCompiler'));
-  if (!jsFile) throw new Error('Failed to emit tsCompiler.ts');
+  if (!jsFile) throw new Error(__('Failed to emit tsCompiler.ts'));
   const mod = { exports: {} };
   // eslint-disable-next-line no-new-func
   new Function('module', 'exports', 'require', '__dirname', '__filename', jsFile.text)(
     mod, mod.exports, require, __dirname, tsFilePath
   );
   _compileFn = mod.exports.compile;
-  if (typeof _compileFn !== 'function') throw new Error('tsCompiler bridge failed to export compile()');
+  if (typeof _compileFn !== 'function') throw new Error(__('tsCompiler bridge failed to export compile()'));
   return _compileFn;
 };
 
@@ -94,22 +95,22 @@ const runEndpointCa = async (wpPath, token, cas, ca, port) => {
 
   app.use((req, res, next) => {
     const start = (new Date()).getTime();
-    console.log(chalk.yellow(` Req [${req.method}] ${req.path}`));
+    console.log(chalk.yellow(` ${__('Req')} [${req.method}] ${req.path}`));
     res.on('finish', () => {
       const end = (new Date()).getTime();
       if(res.statusCode >= 200 && res.statusCode < 300) {
-        console.log(chalk.green(` Res [${res.statusCode}] on ${end - start}ms`));  
+        console.log(chalk.green(` ${__('Res')} [${res.statusCode}] ${__('on %sms', String(end - start))}`));  
       } else {
-        console.log(chalk.red(` Res [${res.statusCode}] on ${end - start}ms`));
+        console.log(chalk.red(` ${__('Res')} [${res.statusCode}] ${__('on %sms', String(end - start))}`));
       }
     });
     next();
   });
 
 
-  const runTest = () => new Promise( r => rl.question("Press ENTER to run test", r ) )
+  const runTest = () => new Promise( r => rl.question(__("Press ENTER to run test"), r ) )
     .then( async () => {
-      console.log('Calling service...')
+      console.log(__('Calling service...'))
       try{
         const ret = await rp({uri:`http://localhost:${port}`});
         console.log(chalk.green(ret));  
@@ -126,13 +127,13 @@ const runEndpointCa = async (wpPath, token, cas, ca, port) => {
   });
 
   app.listen(port, () => {
-    console.log(chalk.green(`Listening in http://localhost:${port}`));
-    console.log('Press Ctrl + C to stop the server.');
+    console.log(chalk.green(__('Listening in http://localhost:%s', String(port))));
+    console.log(__('Press Ctrl + C to stop the server.'));
     runTest();
   });
 
   rl.on("close", function() {
-    console.log("\nBYE BYE !!!");
+    console.log('\n' + __('BYE BYE !!!'));
     process.exit(0);
   });
   
@@ -159,19 +160,19 @@ const runUserCa = async (wpPath, token, cas, ca, vars, params, volatile) => {
     if (result.error && result.stack) {
       const line = result.stack.split('\n')[1] || "";
       const found = line.matchAll(/\<anonymous\>(:\d+:\d+)/g).next();
-      console.error(chalk.red(` ❌ Fail in ${endTime}ms`))
+      console.error(chalk.red(' ❌ ' + __('Fail in %sms', String(endTime))))
       if (found.value) {
         console.error(chalk.red(`${result.stack.split('\n')[0]} at ${filePath}${found.value[1]}`));
       } else {
         console.error(chalk.red(result.stack));
       }
     } else if (result.error) {
-      console.error(chalk.red(` ❌ Fail in ${endTime}ms`))
+      console.error(chalk.red(' ❌ ' + __('Fail in %sms', String(endTime))))
       console.error(chalk.red(result.error));
     } else {
       const resultRendered = resolveRenderer(result.resultState, context);
       console.log(resultRendered)
-      console.log(chalk.green(` ✓ Success in ${endTime}ms`))
+      console.log(chalk.green(' ✓ ' + __('Success in %sms', String(endTime))))
       if (!volatile) {
         const newContext = { ...context, userData: { ...context.userData, variables: { ...context.userData.variables, ...result.resultState.user } } }
         await saveContext(wpPath, newContext);
@@ -191,7 +192,7 @@ const runAiFunctionCa = async (wpPath, token, cas, ca, vars, params, volatile) =
     const msgs = compileResult.errors
       .map(e => (typeof e.message === 'string' ? e.message : e.message.messageText))
       .join('\n');
-    throw new Error(`TypeScript compilation failed:\n${msgs}`);
+    throw new Error(__('TypeScript compilation failed:\n%s', msgs));
   }
   const context = await getContext(wpPath);
   const commandVars = doubleArrayToObject(vars);
@@ -211,7 +212,7 @@ const runAiFunctionCa = async (wpPath, token, cas, ca, vars, params, volatile) =
   );
 
   const fn = mod.exports.default || mod.exports;
-  if (typeof fn !== 'function') throw new Error('MCP CA must export a default function');
+  if (typeof fn !== 'function') throw new Error(__('MCP CA must export a default function'));
 
   const paramOrder = Object.keys(compileResult.inputSchema?.properties || {});
   const paramValues = paramOrder.length > 0
@@ -223,7 +224,7 @@ const runAiFunctionCa = async (wpPath, token, cas, ca, vars, params, volatile) =
     const result = await fn(...paramValues);
     const endTime = new Date().getTime() - startTime;
     console.log(JSON.stringify(result, null, 2));
-    console.log(chalk.green(` ✓ Success in ${endTime}ms`));
+    console.log(chalk.green(' ✓ ' + __('Success in %sms', String(endTime))));
     if (!volatile) {
       const newContext = {
         ...context,
@@ -233,7 +234,7 @@ const runAiFunctionCa = async (wpPath, token, cas, ca, vars, params, volatile) =
     }
   } catch (err) {
     const endTime = new Date().getTime() - startTime;
-    console.error(chalk.red(` ❌ Fail in ${endTime}ms`));
+    console.error(chalk.red(' ❌ ' + __('Fail in %sms', String(endTime))));
     console.error(chalk.red(err.stack || err.message));
   }
   process.exit(0);
@@ -256,7 +257,7 @@ const runFlowOrFormCa = async (wpPath, token, cas, ca) => {
   const data = testData.data || {};
   const responseVar = ca.type === CaType.WHATSAPP_FLOW ? 'flow' : 'form';
 
-  console.log(chalk.yellow(`Running ${ca.type} CA: ${ca.name}`));
+  console.log(chalk.yellow(__('Running %s CA: %s', ca.type, ca.name)));
   console.log(chalk.yellow(`action=${action}${screen ? `, screen=${screen}` : ''}`));
 
   const startTime = new Date().getTime();
@@ -264,17 +265,17 @@ const runFlowOrFormCa = async (wpPath, token, cas, ca) => {
   const endTime = new Date().getTime() - startTime;
 
   if (result.error) {
-    console.error(chalk.red(` ❌ Fail in ${endTime}ms`));
+    console.error(chalk.red(' ❌ ' + __('Fail in %sms', String(endTime))));
     console.error(chalk.red(result.stack || result.error));
   } else {
-    console.log(chalk.green(` ✓ Success in ${endTime}ms`));
+    console.log(chalk.green(' ✓ ' + __('Success in %sms', String(endTime))));
     if (result.nextScreen) {
-      console.log(chalk.cyan(` → nextScreen: ${result.nextScreen}`));
+      console.log(chalk.cyan(` → ${__('nextScreen: %s', result.nextScreen)}`));
     } else {
-      console.log(chalk.cyan(' → flow finished (SUCCESS)'));
+      console.log(chalk.cyan(' → ' + __('flow finished (SUCCESS)')));
     }
     if (result.data && Object.keys(result.data).length > 0) {
-      console.log(chalk.cyan(' → data:'), JSON.stringify(result.data, null, 2));
+      console.log(chalk.cyan(' → ' + __('data:')), JSON.stringify(result.data, null, 2));
     }
     const newFlowState = result.nextScreen
       ? { action: 'data_exchange', screen: result.nextScreen, data: result.data || {} }
@@ -298,7 +299,7 @@ const run = async (pwd, file, { vars, params, volatile, endpoint, port = 7070 })
   } else if (type === CaType.WHATSAPP_FLOW || type === CaType.WEBCHAT_FORM) {
     await runFlowOrFormCa(wpPath, token, cas, ca);
   } else {
-    throw new Error(`'${type}' invalid client action type.`);
+    throw new Error(__("'%s' invalid client action type.", type));
   }
 };
 
