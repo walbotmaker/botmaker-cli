@@ -8,7 +8,7 @@ const getWorkspacePath = require('./getWorkspacePath');
 const { updateCas } = require("./bmService");
 const chalk = require("chalk");
 const publish = require('./publish');
-const { movedName } = require('./caPaths');
+const { movedName, CrossTypeMoveError } = require('./caPaths');
 const { askYesNo } = require('./confirm');
 
 const readFile = util.promisify(fs.readFile);
@@ -27,6 +27,14 @@ const getPushChanges = (status, changes) => {
   const hasLocalCode = changes.includes(ChangeType.LOCAL_CHANGES);
   if (!hasLocalCode) {
     return;
+  }
+
+  // The file is not gone, it was dragged under another type's folder. Say that
+  // instead of the generic message: the fix is to move it back, not to pull.
+  if (status.misplacedAt) {
+    throw new CrossTypeMoveError(
+      { name: status.n, type: status.t }, status.m, status.misplacedAt
+    );
   }
 
   // No local file means f is null, and null differs from the published code,

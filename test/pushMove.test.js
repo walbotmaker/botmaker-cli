@@ -108,3 +108,22 @@ test('accepting a probable move makes the status point at the found file', () =>
   assert.strictEqual(status.m, 'src/user/viejo.js', 'm stays as the cached path, so the move is still visible');
   assert.strictEqual(status.probableMove, undefined, 'it is no longer pending');
 });
+
+test('a file dragged into another type folder gets the type error, not the missing-file one', () => {
+  const status = {
+    id: '1', n: 'user/test_ab', t: 'USER', f: null,
+    fn: 'src/user/test_ab.js', m: 'src/user/test_ab.js', M: 'src/user/test_ab.js',
+    p: 'CODE', u: null,
+    misplacedAt: 'src/webchatforms/test_ab.js',
+  };
+
+  assert.throws(
+    () => getPushChanges(status, [ChangeType.REMOVE_LOCAL, ChangeType.LOCAL_CHANGES]),
+    (err) => {
+      assert.strictEqual(err.name, 'CrossTypeMoveError');
+      assert.match(err.message, /src\/webchatforms\/test_ab\.js/, 'it must say where the file went');
+      assert.match(err.message, /src\/user\//, 'and where it belongs');
+      return true;
+    }
+  );
+});

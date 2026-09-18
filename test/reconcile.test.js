@@ -150,3 +150,54 @@ test('it only looks inside the client action own type folder', async () => {
 
   fs.rmSync(wp, { recursive: true, force: true });
 });
+
+test('a file moved into another type folder is found, not lost', async () => {
+  const wp = fs.mkdtempSync(path.join(os.tmpdir(), 'bmc-'));
+  fs.mkdirSync(path.join(wp, 'src/user'), { recursive: true });
+  fs.mkdirSync(path.join(wp, 'src/webchatforms'), { recursive: true });
+  // A USER client action whose file was dragged into the webchatforms folder.
+  fs.writeFileSync(path.join(wp, 'src/webchatforms/test_ab.js'), 'CODE', 'utf8');
+
+  const cas = [
+    { id: '1', name: 'user/test_ab', type: 'USER', filename: 'src/user/test_ab.js', publishedCode: 'CODE', unPublishedCode: null },
+  ];
+
+  const { exact, probable, misplaced } = await reconcileWorkspace(wp, cas);
+  assert.strictEqual(exact.size, 0, 'it must not be adopted: that would retype the client action');
+  assert.strictEqual(probable.size, 0);
+  assert.strictEqual(misplaced.get('1'), 'src/webchatforms/test_ab.js');
+
+  fs.rmSync(wp, { recursive: true, force: true });
+});
+
+test('a misplaced file is recognised by its name even after an edit', async () => {
+  const wp = fs.mkdtempSync(path.join(os.tmpdir(), 'bmc-'));
+  fs.mkdirSync(path.join(wp, 'src/user'), { recursive: true });
+  fs.mkdirSync(path.join(wp, 'src/mcp'), { recursive: true });
+  fs.writeFileSync(path.join(wp, 'src/mcp/algo.ts'), 'TOTALMENTE DISTINTO', 'utf8');
+
+  const cas = [
+    { id: '1', name: 'user/algo', type: 'USER', filename: 'src/user/algo.js', publishedCode: 'CODE', unPublishedCode: null },
+  ];
+
+  const { misplaced } = await reconcileWorkspace(wp, cas);
+  assert.strictEqual(misplaced.get('1'), 'src/mcp/algo.ts', 'same basename under another type is signal enough');
+
+  fs.rmSync(wp, { recursive: true, force: true });
+});
+
+test('a file in its own type folder is never called misplaced', async () => {
+  const wp = fs.mkdtempSync(path.join(os.tmpdir(), 'bmc-'));
+  fs.mkdirSync(path.join(wp, 'src/user/ventas'), { recursive: true });
+  fs.writeFileSync(path.join(wp, 'src/user/ventas/a.js'), 'CODE', 'utf8');
+
+  const cas = [
+    { id: '1', name: 'user/a', type: 'USER', filename: 'src/user/a.js', publishedCode: 'CODE', unPublishedCode: null },
+  ];
+
+  const { exact, misplaced } = await reconcileWorkspace(wp, cas);
+  assert.strictEqual(misplaced.size, 0);
+  assert.strictEqual(exact.get('1'), 'src/user/ventas/a.js');
+
+  fs.rmSync(wp, { recursive: true, force: true });
+});

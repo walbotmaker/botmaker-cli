@@ -320,9 +320,11 @@ const getLocalStatus = async (wpPath, ca, resolved) => {
   // m is where .bmc says the file is, M is where it actually sits. They differ
   // when someone moved the file or a whole folder in the editor.
   const maybe = resolved && resolved.probable.get(ca.id);
+  const wrongType = resolved && resolved.misplaced.get(ca.id);
   return {
     p, t, f, u, n, id, fn: actualRel, m: cachedRel, M: actualRel,
     ...(maybe && !existFile ? { probableMove: maybe } : {}),
+    ...(wrongType && !existFile ? { misplacedAt: wrongType } : {}),
   };
 }
 

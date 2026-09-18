@@ -2,7 +2,7 @@ const path = require('path');
 const util = require('util');
 const fs = require('fs');
 const diff = require('diff');
-const { getTypeFolder } = require('./caTypes');
+const { getTypeFolder, TYPE_FOLDERS } = require('./caTypes');
 
 const readFile = util.promisify(fs.readFile);
 const exists = util.promisify(fs.exists);
@@ -120,7 +120,9 @@ const reconcileWorkspace = async (wpPath, cas) => {
     if (!ca.filename || !ca.id) continue;
     if (!(await exists(path.join(wpPath, ca.filename)))) missingCas.push(ca);
   }
-  if (missingCas.length === 0) return { exact: new Map(), probable: new Map() };
+  if (missingCas.length === 0) {
+    return { exact: new Map(), probable: new Map(), misplaced: new Map() };
+  }
 
   const byTypeFolder = new Map();
   const candidatesFor = async (type) => {
@@ -146,7 +148,38 @@ const reconcileWorkspace = async (wpPath, cas) => {
     for (const [id, rel] of matched.exact) exact.set(id, rel);
     for (const [id, hit] of matched.probable) probable.set(id, hit);
   }
-  return { exact, probable };
+
+  // Whatever is still missing may have been dragged into another type's folder.
+  // That is not a move to follow — it would retype the client action — but
+  // losing track of it turns one clear mistake into two confusing ones, so find
+  // it and let the caller report where it went.
+  const misplaced = new Map();
+  const stillMissing = missingCas.filter(ca => !exact.has(ca.id) && !probable.has(ca.id));
+  if (stillMissing.length > 0) {
+    const foreign = [];
+    for (const typeFolder of TYPE_FOLDERS) {
+      const rels = await walkFiles(path.join(wpPath, 'src', typeFolder), `src/${typeFolder}`);
+      for (const rel of rels) {
+        if (!claimed.has(rel)) foreign.push({ relPath: rel, typeFolder });
+      }
+    }
+    for (const ca of stillMissing) {
+      const own = getTypeFolder(ca.type);
+      const wantedBase = path.basename(ca.filename, path.extname(ca.filename));
+      const hits = [];
+      for (const file of foreign) {
+        if (file.typeFolder === own) continue;
+        const sameName = path.basename(file.relPath, path.extname(file.relPath)) === wantedBase;
+        const sameCode = sameName
+          ? true
+          : knownVersions(ca).includes(await readFile(path.join(wpPath, file.relPath), 'UTF-8'));
+        if (sameName || sameCode) hits.push(file.relPath);
+      }
+      if (hits.length === 1) misplaced.set(ca.id, hits[0]);
+    }
+  }
+
+  return { exact, probable, misplaced };
 };
 
 module.exports = {
