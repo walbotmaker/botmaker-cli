@@ -289,7 +289,8 @@ export const compile = async (tsCode: string, globalsPath?: string): Promise<Com
     if (!tsCode || tsCode.trim() === "") {
         throw new Error("No TypeScript code provided");
     }
-    console.log("Compiling TypeScript code...");
+    // Progress goes to stderr: stdout belongs to the result, which --json parses.
+    console.error("Compiling TypeScript code...");
     const sourceFileName = "index.ts";
 
     const sourceFile = ts.createSourceFile(sourceFileName, tsCode, ts.ScriptTarget.ESNext);

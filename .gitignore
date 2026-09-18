@@ -3,5 +3,7 @@ node_modules/
 lastInstall
 
 CLAUDE.md
+# ...except the one we ship inside a new workspace, which just points at AGENTS.md.
+!workspaceTemplate/CLAUDE.md
 
 docs/

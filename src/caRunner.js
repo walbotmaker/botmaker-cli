@@ -65,7 +65,7 @@ const ___runMain = (
     vm.runInNewContext(code, mainContext, { filename })
 }
 
-module.exports = (code, context, helpers, fulfill, token, filename) => {
+module.exports = (code, context, helpers, fulfill, token, filename, bmconsoleOverride) => {
     const chalk = require('chalk');
 
     const __parceStackTrace = (error) => {
@@ -139,7 +139,9 @@ module.exports = (code, context, helpers, fulfill, token, filename) => {
     });
 
     try {
-        const bmconsole = console
+        // --json mode hands us a console that collects instead of printing, so
+        // what the client action logs cannot break the JSON on stdout.
+        const bmconsole = bmconsoleOverride || console
 
         const entityLoader = (entityName, cb) => {
             rp({

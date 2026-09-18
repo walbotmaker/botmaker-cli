@@ -123,6 +123,8 @@ The output is printed as formatted JSON:
 | `-p <name> <value>` | Pass a named parameter to the function |
 | `-v <name> <value>` | Set a user variable accessible via `User.get()` |
 | `--volatile` | Skip persisting state to `context.json` after the run |
+| `--json` | Print one JSON object with the result, for scripts and coding agents |
+| `--schema` | Print the input schema without running the function |
 
 ---
 
@@ -180,6 +182,62 @@ To force a fresh fetch from the API, delete `chat.json` or `catalog.json`. To re
 
 ---
 
+## Using bmc from a coding agent
+
+`bmc run` is the only command built to be read by a machine. Pass `--json` and
+stdout holds one object and nothing else; everything human goes to stderr.
+
+```bash
+bmc run --json src/mcp/ventas/mifn.ts -p myNumber 21
+```
+
+```json
+{
+  "ok": true,
+  "type": "AI_FUNCTION",
+  "name": "ventas/mifn",
+  "durationMs": 34,
+  "result": 42,
+  "inputSchema": { "type": "object", "properties": { "myNumber": {} } },
+  "logs": [{ "level": "log", "message": "what the code printed" }]
+}
+```
+
+Whatever the client action prints lands in `logs` instead of on stdout, so it
+cannot break the JSON. A WhatsApp Flow or Webchat Form also reports `action`,
+`screen`, `nextScreen`, `data` and the `flowState` it wrote to
+`flowstate.json`.
+
+**The exit code of `run` is 0 when it worked and 1 when anything failed**, with
+or without `--json`. The other commands still exit 0 even when they fail.
+
+When it fails, `error.kind` is `COMPILE`, `RUNTIME` or `USAGE`, and
+`error.code` is a stable string that is never translated:
+
+| code | what happened |
+|---|---|
+| `TS_COMPILE_FAILED` | The TypeScript did not build (`diagnostics` has the details) |
+| `CA_THREW` | The client action threw while running |
+| `CA_NOT_A_FUNCTION` | An MCP client action must `export default` a function |
+| `RESULT_NOT_SERIALIZABLE` | What it returned cannot be turned into JSON |
+| `CA_NOT_FOUND` | No client action by that name or path |
+| `SCHEMA_ONLY_FOR_AI_FUNCTION` | `--schema` only applies to MCP client actions |
+| `JSON_NOT_SUPPORTED_FOR_ENDPOINT` | `--json` cannot describe a server |
+| `RUN_SETUP_FAILED` | It never got to run: no workspace, broken `.bmc`, … |
+
+`--schema` compiles an MCP client action and prints its input schema without
+running it. That schema is what the model sees as a tool, so it is usually the
+thing worth checking:
+
+```bash
+bmc run --json --schema src/mcp/ventas/mifn.ts
+```
+
+A new workspace ships an `AGENTS.md` explaining all of this to the agent
+working inside it.
+
+---
+
 ## Language
 
 The CLI speaks English, Spanish, Portuguese and French. It picks the language
@@ -193,8 +251,8 @@ export BMC_LANG=es      # for the session
 ```
 
 Two things stay in English on purpose: the short change codes (`Lc`, `Rn`, …),
-because you type them into `bmc diff <name> <code>`, and the JSON that
-`bmc run` prints for an MCP client action, because it is read by machines.
+because you type them into `bmc diff <name> <code>`, and everything
+`bmc run --json` prints, error codes included, because it is read by machines.
 
 ### Adding or changing a message
 

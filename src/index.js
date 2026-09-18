@@ -34,9 +34,11 @@ const main = async (args) => {
           describe: __('<paramName> <paramValue> Set a param'),
           nargs: 2
         })
-        .option('volatile', { describe: __('Will not presist the state') })
-        .option('endpoint', { describe: __('Force to run as endpoint') })
-        .option('port <portNumber>', { describe: __('Change endpoint port number') })
+        .option('volatile', { type: 'boolean', describe: __('Will not presist the state') })
+        .option('endpoint', { type: 'boolean', describe: __('Force to run as endpoint') })
+        .option('port', { type: 'number', describe: __('Change endpoint port number') })
+        .option('json', { type: 'boolean', describe: __('Print the result as a single JSON object, for scripts and coding agents') })
+        .option('schema', { type: 'boolean', describe: __('Print the AI function input schema without running it') })
       ,
     )
     .command(
@@ -171,8 +173,8 @@ const main = async (args) => {
       break;
     case "run":
     case "r":
-      const { source, v = [], p = [], volatile = false, endpoint, port } = arrgs;
-      await run(pwd, source, { vars: v, params: p, volatile, endpoint, port})
+      const { source, v = [], p = [], volatile = false, endpoint, port, json = false, schema = false } = arrgs;
+      await run(pwd, source, { vars: v, params: p, volatile, endpoint, port, json, schema })
       break;
     case "status":
     case "s":

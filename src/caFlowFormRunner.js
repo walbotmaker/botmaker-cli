@@ -38,7 +38,7 @@ const cloneGlobal = () => {
  * @param {string} opts.responseVar - 'flow' (WHATSAPP_FLOW) or 'form' (WEBCHAT_FORM)
  * @returns {Promise<{nextScreen?: string, data?: object, error?: string, stack?: string}>}
  */
-module.exports = ({ code, filePath, helpers, token, wpPath, context, action, screen, data, responseVar }) => {
+module.exports = ({ code, filePath, helpers, token, wpPath, context, action, screen, data, responseVar, bmconsole: bmconsoleOverride }) => {
   return new Promise((resolve) => {
     let settled = false;
     const settle = (result) => {
@@ -48,12 +48,15 @@ module.exports = ({ code, filePath, helpers, token, wpPath, context, action, scr
       resolve(result);
     };
 
-    // bmconsole with colored output matching caEndpointRunner style
+    // bmconsole with colored output matching caEndpointRunner style, unless the
+    // caller passed one that collects (--json needs stdout for the result).
     const consoleColors = { log: chalk.green, warn: chalk.yellow, error: chalk.red };
-    const bmconsole = {};
-    ['log', 'warn', 'error'].forEach(method => {
-      bmconsole[method] = (...args) => console[method](consoleColors[method](...args));
-    });
+    const bmconsole = bmconsoleOverride || {};
+    if (!bmconsoleOverride) {
+      ['log', 'warn', 'error'].forEach(method => {
+        bmconsole[method] = (...args) => console[method](consoleColors[method](...args));
+      });
+    }
 
     // chatReference for botmakerAPI live calls — pulled from context if present
     const chatReference = (context && context.userData && context.userData._id_) || 'local-test';
