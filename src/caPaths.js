@@ -99,6 +99,17 @@ const movedName = (ca, actualRel) => {
   return [...folders, leaf].join('/');
 };
 
+// Same file, same folders, under the right type. Used to put back a file that
+// was dragged into another type's folder: only the type segment is wrong, so
+// any folders the user built inside it are kept rather than flattened away.
+const withTypeFolder = (type, relPath) => {
+  const segments = String(relPath || '').split('\\').join('/').split('/');
+  const typeFolder = getTypeFolder(type);
+  if (!typeFolder || segments.length < 3 || segments[0] !== 'src') return null;
+  if (!TYPE_FOLDER_SET.has(segments[1])) return null;
+  return ['src', typeFolder, ...segments.slice(2)].join('/');
+};
+
 const assertNoForeignTypePrefix = (type, name) => {
   const first = String(name || '').split('/').filter(Boolean)[0];
   const typeFolder = getTypeFolder(type);
@@ -118,6 +129,7 @@ module.exports = {
   nameToRelPath,
   relPathToName,
   movedName,
+  withTypeFolder,
   assertNoForeignTypePrefix,
   CrossTypeMoveError,
 };

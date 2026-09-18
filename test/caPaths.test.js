@@ -83,3 +83,27 @@ test('creating a client action under another type folder is refused', () => {
 test('the type prefix of its own type is fine', () => {
   assert.doesNotThrow(() => assertNoForeignTypePrefix('ENDPOINT', 'endpoint/x'));
 });
+
+const { withTypeFolder } = require('../src/caPaths');
+
+test('swapping the type folder keeps the folders the user built', () => {
+  assert.strictEqual(
+    withTypeFolder('USER', 'src/schedule/test_2/carrousel.js'),
+    'src/user/test_2/carrousel.js'
+  );
+});
+
+test('a file at the root of the wrong type folder lands at the root of the right one', () => {
+  assert.strictEqual(withTypeFolder('USER', 'src/mcp/algo.js'), 'src/user/algo.js');
+});
+
+test('nested folders survive whole', () => {
+  assert.strictEqual(
+    withTypeFolder('ENDPOINT', 'src/user/ventas/promos/x.js'),
+    'src/endpoint/ventas/promos/x.js'
+  );
+});
+
+test('a path that is not under a type folder gives nothing back to guess from', () => {
+  assert.strictEqual(withTypeFolder('USER', 'suelto.js'), null);
+});

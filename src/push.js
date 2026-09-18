@@ -8,7 +8,7 @@ const getWorkspacePath = require('./getWorkspacePath');
 const { updateCas } = require("./bmService");
 const chalk = require("chalk");
 const publish = require('./publish');
-const { movedName, CrossTypeMoveError } = require('./caPaths');
+const { movedName, withTypeFolder, CrossTypeMoveError } = require('./caPaths');
 const { askYesNo } = require('./confirm');
 const { moveLocalFile } = require('./workspaceFiles');
 
@@ -80,10 +80,10 @@ const resolveProbableMove = async (wpPath, status) => {
 
 // The file is back where .bmc expects it, so this is not a move at all — just a
 // client action that can be pushed again.
-const adoptRestoredFile = (status, content) => {
+const adoptRestoredFile = (status, content, restoredTo) => {
   status.f = content;
-  status.fn = status.m;
-  status.M = status.m;
+  status.fn = restoredTo;
+  status.M = restoredTo;
   delete status.misplacedAt;
 };
 
@@ -92,15 +92,18 @@ const adoptRestoredFile = (status, content) => {
 const resolveMisplacedFile = async (wpPath, status) => {
   if (!status.misplacedAt) return false;
   const from = status.misplacedAt;
+  // Only the type segment is wrong. Keep whatever folders live below it, so a
+  // folder the user made inside the workspace is not flattened on the way back.
+  const to = withTypeFolder(status.t, from) || status.m;
   console.log(chalk.yellow(
     `'${status.n}' is a ${status.t} client action but its file sits in ` +
     `${path.dirname(from)}/.`
   ));
-  const yes = await askYesNo(chalk.yellow(`Move ${from} back to ${status.m}?`));
+  const yes = await askYesNo(chalk.yellow(`Move ${from} back to ${to}?`));
   if (!yes) return false;
-  await moveLocalFile(wpPath, from, status.m);
-  console.log(chalk.green(`${from} moved back to ${status.m}`));
-  adoptRestoredFile(status, await readFile(path.join(wpPath, status.m), 'UTF-8'));
+  await moveLocalFile(wpPath, from, to);
+  console.log(chalk.green(`${from} moved back to ${to}`));
+  adoptRestoredFile(status, await readFile(path.join(wpPath, to), 'UTF-8'), to);
   return true;
 };
 
