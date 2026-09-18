@@ -109,7 +109,7 @@ test('accepting a probable move makes the status point at the found file', () =>
   assert.strictEqual(status.probableMove, undefined, 'it is no longer pending');
 });
 
-test('a file dragged into another type folder gets the type error, not the missing-file one', () => {
+test('a file dragged into another type folder is told where it belongs, not moved for you', () => {
   const status = {
     id: '1', n: 'user/test_ab', t: 'USER', f: null,
     fn: 'src/user/test_ab.js', m: 'src/user/test_ab.js', M: 'src/user/test_ab.js',
@@ -122,7 +122,7 @@ test('a file dragged into another type folder gets the type error, not the missi
     (err) => {
       assert.strictEqual(err.name, 'CrossTypeMoveError');
       assert.match(err.message, /src\/webchatforms\/test_ab\.js/, 'it must say where the file went');
-      assert.match(err.message, /src\/user\//, 'and where it belongs');
+      assert.match(err.message, /Move it anywhere under 'src\/user\/'/, 'and that any spot under its type works');
       return true;
     }
   );
@@ -152,41 +152,3 @@ test('no blockers means nothing to throw', () => {
   assert.strictEqual(combineBlockers([]), null);
 });
 
-const { adoptRestoredFile } = require('../src/push');
-const { withTypeFolder } = require('../src/caPaths');
-
-test('putting a misplaced file back leaves the status ready to push', () => {
-  const status = {
-    id: '1', n: 'SelectedProduct', t: 'USER', f: null,
-    fn: 'src/user/selectedproduct.js', m: 'src/user/selectedproduct.js',
-    M: 'src/user/selectedproduct.js', p: 'CODE', u: null,
-    misplacedAt: 'src/whatsappflow/selectedproduct.js',
-  };
-
-  adoptRestoredFile(status, 'CODE', 'src/user/selectedproduct.js');
-
-  assert.strictEqual(status.misplacedAt, undefined, 'it no longer blocks the push');
-  assert.strictEqual(status.f, 'CODE', 'the code is readable again');
-  assert.strictEqual(status.fn, 'src/user/selectedproduct.js');
-  assert.strictEqual(status.M, 'src/user/selectedproduct.js', 'it is back where .bmc says, so this is not a move');
-  assert.strictEqual(status.m, 'src/user/selectedproduct.js');
-});
-
-test('a file restored into a folder the user built stays in that folder', () => {
-  // The folder test_2 was made locally and never pushed, so .bmc still has the
-  // client action at the root of src/user.
-  const status = {
-    id: '1', n: 'Carrousel', t: 'USER', f: null,
-    fn: 'src/user/carrousel.js', m: 'src/user/carrousel.js',
-    M: 'src/user/carrousel.js', p: 'CODE', u: null,
-    misplacedAt: 'src/schedule/test_2/carrousel.js',
-  };
-  const to = withTypeFolder(status.t, status.misplacedAt);
-
-  assert.strictEqual(to, 'src/user/test_2/carrousel.js', 'the folder must survive the trip back');
-
-  adoptRestoredFile(status, 'CODE', to);
-  assert.strictEqual(status.fn, 'src/user/test_2/carrousel.js');
-  assert.strictEqual(status.M, 'src/user/test_2/carrousel.js');
-  assert.strictEqual(status.m, 'src/user/carrousel.js', 'the cached path still differs, so the move is pushable');
-});

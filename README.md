@@ -49,10 +49,11 @@ client action inside it moving at once.
 
 Two rules the CLI enforces:
 
-- A file cannot be moved into another type's folder. Moving a file never
-  changes a client action's type, so `bmc push` offers to move it back and
-  refuses the whole push if you decline. It lists every misplaced file at once,
-  not one per run.
+- A file cannot live under another type's folder. Moving a file never changes a
+  client action's type, so `bmc push` stops and tells you to put it back
+  anywhere under its own type folder — it names a spot that keeps whatever
+  folders you had built, but any place under that type works. It lists every
+  misplaced file at once, not one per run.
 - The same file name in two different folders is fine.
 
 If you move and rename a file at the same time, the CLI still finds it: it

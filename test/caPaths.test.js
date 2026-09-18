@@ -107,3 +107,23 @@ test('nested folders survive whole', () => {
 test('a path that is not under a type folder gives nothing back to guess from', () => {
   assert.strictEqual(withTypeFolder('USER', 'suelto.js'), null);
 });
+
+test('the error points at the type folder and suggests keeping the folders', () => {
+  const err = new CrossTypeMoveError(
+    { name: 'Carrousel', type: 'USER' },
+    'src/user/carrousel.js',
+    'src/schedule/test_2/carrousel.js'
+  );
+  assert.match(err.message, /Move it anywhere under 'src\/user\/'/);
+  assert.match(err.message, /src\/user\/test_2\/carrousel\.js/, 'it suggests the same folder under the right type');
+});
+
+test('with no folders to keep, the error suggests nothing extra', () => {
+  const err = new CrossTypeMoveError(
+    { name: 'test-csv', type: 'USER' },
+    'src/user/test_csv.js',
+    'src/webchatforms/test_csv.js'
+  );
+  assert.match(err.message, /Move it anywhere under 'src\/user\/', then push again/);
+  assert.ok(!/would keep the folders/.test(err.message), 'no folder suggestion when there is no folder');
+});

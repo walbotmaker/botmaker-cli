@@ -60,12 +60,29 @@ const relPathToName = (type, relPath) => {
   return typeFolder ? `${typeFolder}/${withoutExt}` : withoutExt;
 };
 
+// Same file, same folders, under the right type. Used to put back a file that
+// was dragged into another type's folder: only the type segment is wrong, so
+// any folders the user built inside it are kept rather than flattened away.
+const withTypeFolder = (type, relPath) => {
+  const segments = String(relPath || '').split('\\').join('/').split('/');
+  const typeFolder = getTypeFolder(type);
+  if (!typeFolder || segments.length < 3 || segments[0] !== 'src') return null;
+  if (!TYPE_FOLDER_SET.has(segments[1])) return null;
+  return ['src', typeFolder, ...segments.slice(2)].join('/');
+};
+
 class CrossTypeMoveError extends Error {
   constructor(ca, cachedRel, actualRel) {
+    const home = `src/${getTypeFolder(ca.type)}/`;
+    // Any folder under its own type works, so suggest the same spot one level
+    // up rather than pretending there is a single right answer.
+    const swapped = withTypeFolder(ca.type, actualRel);
+    const insideFolders = swapped && swapped.split('/').length > 3;
     super(
       `'${ca.name}' is a ${ca.type} client action but its file now sits at ` +
-      `'${actualRel}'. Move it back under 'src/${getTypeFolder(ca.type)}/'. ` +
-      `Moving a file cannot change a client action's type.`
+      `'${actualRel}'. Move it anywhere under '${home}'` +
+      (insideFolders ? ` — '${swapped}' would keep the folders you made` : '') +
+      `, then push again. Moving a file cannot change a client action's type.`
     );
     this.name = 'CrossTypeMoveError';
     this.ca = ca;
@@ -97,17 +114,6 @@ const movedName = (ca, actualRel) => {
   const leaf = newBase === oldBase ? leafOf(ca.name) : newBase;
   const folders = relPathToName(ca.type, actualRel).split('/').slice(0, -1);
   return [...folders, leaf].join('/');
-};
-
-// Same file, same folders, under the right type. Used to put back a file that
-// was dragged into another type's folder: only the type segment is wrong, so
-// any folders the user built inside it are kept rather than flattened away.
-const withTypeFolder = (type, relPath) => {
-  const segments = String(relPath || '').split('\\').join('/').split('/');
-  const typeFolder = getTypeFolder(type);
-  if (!typeFolder || segments.length < 3 || segments[0] !== 'src') return null;
-  if (!TYPE_FOLDER_SET.has(segments[1])) return null;
-  return ['src', typeFolder, ...segments.slice(2)].join('/');
 };
 
 const assertNoForeignTypePrefix = (type, name) => {

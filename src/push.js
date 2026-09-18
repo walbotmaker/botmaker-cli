@@ -10,7 +10,6 @@ const chalk = require("chalk");
 const publish = require('./publish');
 const { movedName, withTypeFolder, CrossTypeMoveError } = require('./caPaths');
 const { askYesNo } = require('./confirm');
-const { moveLocalFile } = require('./workspaceFiles');
 
 const readFile = util.promisify(fs.readFile);
 
@@ -75,35 +74,6 @@ const resolveProbableMove = async (wpPath, status) => {
   const yes = await askYesNo(chalk.yellow(`Treat ${relPath} as '${status.n}' and rename it on the platform?`));
   if (!yes) return false;
   adoptProbableMove(status, await readFile(path.join(wpPath, relPath), 'UTF-8'));
-  return true;
-};
-
-// The file is back where .bmc expects it, so this is not a move at all — just a
-// client action that can be pushed again.
-const adoptRestoredFile = (status, content, restoredTo) => {
-  status.f = content;
-  status.fn = restoredTo;
-  status.M = restoredTo;
-  delete status.misplacedAt;
-};
-
-// A file under the wrong type folder cannot be followed, but it can be put back.
-// Offer that instead of only complaining about it.
-const resolveMisplacedFile = async (wpPath, status) => {
-  if (!status.misplacedAt) return false;
-  const from = status.misplacedAt;
-  // Only the type segment is wrong. Keep whatever folders live below it, so a
-  // folder the user made inside the workspace is not flattened on the way back.
-  const to = withTypeFolder(status.t, from) || status.m;
-  console.log(chalk.yellow(
-    `'${status.n}' is a ${status.t} client action but its file sits in ` +
-    `${path.dirname(from)}/.`
-  ));
-  const yes = await askYesNo(chalk.yellow(`Move ${from} back to ${to}?`));
-  if (!yes) return false;
-  await moveLocalFile(wpPath, from, to);
-  console.log(chalk.green(`${from} moved back to ${to}`));
-  adoptRestoredFile(status, await readFile(path.join(wpPath, to), 'UTF-8'), to);
   return true;
 };
 
@@ -183,7 +153,7 @@ const singlePush = async (pwd, caName) => {
   if (hasIncomingChanges(changes)){
     throw new Error('There is incoming changes. You must make a pull first.');
   }
-  if (await resolveMisplacedFile(wpPath, status) || await resolveProbableMove(wpPath, status)) {
+  if (await resolveProbableMove(wpPath, status)) {
     changes = getStatus.getChangesFromStatus(status);
   }
   const { token, cas } = await getBmc(wpPath);
@@ -215,7 +185,7 @@ const completePush = async (pwd) => {
     if (hasIncomingChanges(changes)){
       throw new Error('There is incoming changes you must make an pull first.');
     }
-    if (await resolveMisplacedFile(wpPath, status) || await resolveProbableMove(wpPath, status)) {
+    if (await resolveProbableMove(wpPath, status)) {
       changes = getStatus.getChangesFromStatus(status);
     }
     statuses.push(status);
@@ -270,7 +240,6 @@ push.collectMoveUpdates = collectMoveUpdates;
 push.getPushChanges = getPushChanges;
 push.adoptProbableMove = adoptProbableMove;
 push.combineBlockers = combineBlockers;
-push.adoptRestoredFile = adoptRestoredFile;
 push.mergePushEntries = mergePushEntries;
 
 module.exports = push;
