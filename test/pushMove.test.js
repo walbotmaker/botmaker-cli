@@ -127,3 +127,27 @@ test('a file dragged into another type folder gets the type error, not the missi
     }
   );
 });
+
+const { combineBlockers } = require('../src/push');
+
+test('every blocking problem is reported at once, not one per run', () => {
+  const errors = [
+    new Error("'SelectedProduct' is a USER client action but its file now sits at 'src/whatsappflow/selectedproduct.js'."),
+    new Error("'test-csv' is a USER client action but its file now sits at 'src/webchatforms/test_csv.js'."),
+  ];
+
+  const combined = combineBlockers(errors);
+  assert.match(combined.message, /2 client actions/);
+  assert.match(combined.message, /SelectedProduct/);
+  assert.match(combined.message, /test-csv/, 'the second one must be in there too');
+  assert.match(combined.message, /Nothing was sent/);
+});
+
+test('a single blocker keeps its own message, with no list wrapper', () => {
+  const only = new Error("'a' is a USER client action but its file now sits at 'src/mcp/a.js'.");
+  assert.strictEqual(combineBlockers([only]), only);
+});
+
+test('no blockers means nothing to throw', () => {
+  assert.strictEqual(combineBlockers([]), null);
+});

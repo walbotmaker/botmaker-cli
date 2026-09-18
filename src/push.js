@@ -77,6 +77,18 @@ const resolveProbableMove = async (wpPath, status) => {
   return true;
 };
 
+// Everything wrong is reported together. Stopping at the first problem means
+// fixing one, pushing again, and discovering the next — one round trip per
+// mistake, when the CLI already knows about all of them.
+const combineBlockers = (errors) => {
+  if (errors.length === 0) return null;
+  if (errors.length === 1) return errors[0];
+  const list = errors.map(e => `  * ${e.message}`).join('\n');
+  return new Error(
+    `${errors.length} client actions block the push:\n${list}\nNothing was sent.`
+  );
+};
+
 // One entry per client action whose file no longer sits where .bmc says it is.
 // Moving a folder is just every client action under it moving at once, so there
 // is no special case for folders. Throws on the first file found under the wrong
@@ -166,6 +178,7 @@ const completePush = async (pwd) => {
   const changesGenerator = getStatus.getStatusChanges(pwd);
   const entries = [];
   const statuses = [];
+  const blockers = [];
   for await (let statucChanges of changesGenerator) {
     const { status } = statucChanges;
     let { changes } = statucChanges;
@@ -176,7 +189,13 @@ const completePush = async (pwd) => {
       changes = getStatus.getChangesFromStatus(status);
     }
     statuses.push(status);
-    const pushChanges = getPushChanges(status, changes);
+    let pushChanges;
+    try {
+      pushChanges = getPushChanges(status, changes);
+    } catch (err) {
+      blockers.push(err);
+      continue;
+    }
     if (pushChanges) {
       if (pushChanges.payload.unPublishedCode !== undefined) {
         checkClientActionLength(pushChanges.payload.unPublishedCode, status.n);
@@ -184,6 +203,8 @@ const completePush = async (pwd) => {
       entries.push(pushChanges);
     }
   }
+  const blocked = combineBlockers(blockers);
+  if (blocked) throw blocked;
   // Throws before anything is sent if some file sits under the wrong type.
   const moves = collectMoveUpdates(cas, statuses);
   const toPush = mergePushEntries(entries, moves, statuses);
@@ -218,6 +239,7 @@ const push = async (pwd, caName, forPublish) => {
 push.collectMoveUpdates = collectMoveUpdates;
 push.getPushChanges = getPushChanges;
 push.adoptProbableMove = adoptProbableMove;
+push.combineBlockers = combineBlockers;
 push.mergePushEntries = mergePushEntries;
 
 module.exports = push;
