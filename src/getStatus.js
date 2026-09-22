@@ -142,6 +142,10 @@ const ChangeType = {
 Remote = UPPERCASE -> P U N T
 Local = lowercase  -> p u f n t
 
+m/M are the exception to that rule: both are local. m is the path .bmc has
+cached for the file, M is where the file actually sits. They differ when
+someone moved it outside the CLI, which is what 'Mv' reports.
+
 [X] = Nothing
 [!] = Not ... [!X] = Something
 [space] = and
