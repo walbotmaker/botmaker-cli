@@ -140,13 +140,17 @@ const ChangeType = {
 [N]ame
 [T]ype
 
-Remote = UPPERCASE -> P U N T
+Remote = UPPERCASE -> P U   N T
 Local = lowercase  -> p u f n t
+The gap in the remote row is there so the columns line up: the file only
+exists on disk, so there is no remote [F]. Without the gap you would have to
+push f to the end and each local letter would stop sitting under its remote pair.
 
 m/M are the exception to that rule: both are local. m is the path .bmc has
 cached for the file, M is where the file actually sits. They differ when
 someone moved it outside the CLI, which is what 'Mv' reports.
 
+These apply to the code strings below ('!XP !Xp !Tt'), not to the table above:
 [X] = Nothing
 [!] = Not ... [!X] = Something
 [space] = and
